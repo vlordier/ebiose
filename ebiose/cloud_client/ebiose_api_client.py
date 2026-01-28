@@ -84,7 +84,7 @@ class EbioseAPIClient:
         return s2.lower()
 
     @classmethod
-    def _convert_data_keys(cls, data: any) -> any:
+    def _convert_data_keys(cls, data: Any) -> Any:
         """Recursively traverses a data structure (dict or list) and converts
         all dictionary keys from PascalCase to snake_case.
         """
@@ -148,7 +148,7 @@ class EbioseAPIClient:
 
     @classmethod
     @_handle_api_errors
-    def log(cls, message: dict[str, any]) -> None:
+    def log(cls, message: dict[str, Any]) -> None:
         """Log a message to the API."""
         json_message = json.dumps(message, sort_keys=True)
         log_entry = LogEntryInputModel(

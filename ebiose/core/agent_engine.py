@@ -5,6 +5,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import traceback
 from abc import abstractmethod
@@ -57,8 +58,8 @@ class AgentEngine(BaseModel):
         agent_input: BaseModel,
         master_agent_id: str,
         forge_cycle_id: str | None = None,
-        **kwargs: dict[str, any],
-    ) -> any:
+        **kwargs: dict[str, Any],
+    ) -> Any:
         try:
             return await self._run_implementation(
                 agent_input,
@@ -80,6 +81,6 @@ class AgentEngine(BaseModel):
         agent_input: BaseModel,
         master_agent_id: str,
         forge_cycle_id: str | None = None,
-        **kwargs: dict[str, any],
-    ) -> any:
+        **kwargs: dict[str, Any],
+    ) -> Any:
         pass
