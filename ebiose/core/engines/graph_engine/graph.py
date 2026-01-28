@@ -319,7 +319,7 @@ class Graph(BaseModel):
         """
         for node in self.nodes:
             if isinstance(node, EndNode):
-                return node.id
+                return str(node.id)
         msg = "End node not found in the graph"
         raise ValueError(msg)
 

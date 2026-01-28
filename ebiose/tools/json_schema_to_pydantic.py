@@ -28,7 +28,7 @@ _MODEL_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 _DEFS_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 
 
-def _get_python_type(
+def _get_python_type(  # type: ignore[return]
     schema: dict[str, Any],
     recursion_depth: int = 0,
 ) -> type | ForwardRef:
@@ -174,13 +174,17 @@ def _get_python_type(
     actual_types = tuple(t for t in possible_types if t is not type(None))
 
     if not actual_types:
-        return type(None)  # Only None/null was possible
+        return type(None)  # type: ignore[return]  # Only None/null was possible
     if len(actual_types) == 1:
         final_type = actual_types[0]
-        return Optional[final_type] if has_null else final_type
+        if has_null:
+            return Union[final_type, type(None)]  # type: ignore[return-value]
+        return final_type
     # Use Union[] for multiple types
-    union_type = Union[actual_types]  # type: ignore[arg-type]
-    return Optional[union_type] if has_null else union_type
+    union_type = Union[tuple(actual_types)]  # type: ignore[arg-type,return-value]
+    if has_null:
+        return Union[union_type, type(None)]  # type: ignore[return-value]
+    return union_type  # type: ignore[return-value]
 
 
 def _create_model_recursive(

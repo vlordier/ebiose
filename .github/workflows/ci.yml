@@ -39,5 +39,23 @@ jobs:
     - name: Run mypy type checking
       run: uv run mypy .
 
+    - name: Lint YAML files
+      run: |
+        uv run pip install yamllint
+        uv run yamllint . --exclude="notebooks/" || true
+
+    - name: Lint Docker files
+      run: |
+        if [ -f Dockerfile ]; then
+          uv run pip install hadolint
+          uv run hadolint Dockerfile || true
+        fi
+
+    - name: Lint Makefiles
+      run: |
+        if [ -f Makefile ]; then
+          echo "Makefile linting would go here"
+        fi
+
     - name: Run tests
       run: uv run pytest

@@ -32,6 +32,7 @@ dependencies = [
 line-length = 88
 target-version = "py312"
 exclude = ["./notebooks/", "./ebiose/generated_cloud_sdk/"]
+# ruff handles Python files by default, other files are handled separately
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -54,9 +55,6 @@ ignore = [
   "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
   "ERA001",  # commented-out code (too many to fix manually)
 ]
-
-# Additional file type linting
-extend-include = ["*.yml", "*.yaml", "*.md", "*.ipynb", "Dockerfile*", "Makefile*"]
 
 [tool.ruff.lint.per-file-ignores]
 # YAML files - focus on syntax and structure
@@ -101,7 +99,16 @@ module = "test_*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
-# Additional linting tools
+# Additional linting tools for multi-file support
+[tool.yamllint]
+config = """
+extends: default
+rules:
+  line-length: disable
+  comments-indentation: disable
+  truthy: disable
+"""
+
 [tool.yamlfix]
 include = ["*.yml", "*.yaml"]
 exclude = ["notebooks/**"]
@@ -109,6 +116,10 @@ exclude = ["notebooks/**"]
 [tool.yamlfmt]
 include = ["*.yml", "*.yaml"]
 exclude = ["notebooks/**"]
+
+# Docker linting configuration
+[tool.hadolint]
+ignored-codes = ["DL3008", "DL3013", "DL3018"]  # Common acceptable warnings
 
 [build-system]
 requires = ["hatchling"]
