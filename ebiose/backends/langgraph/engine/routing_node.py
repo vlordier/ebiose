@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence  # noqa: TC003
-from typing import Literal
+from typing import Literal, cast
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
 from langgraph.runtime import Runtime
@@ -77,20 +77,57 @@ class LangGraphRoutingNode(RoutingNode):
 
     async def call_node(
         self,
-        state: BaseModel | dict,
+        state: InputState | dict,
         runtime: Runtime[BaseModel],
     ) -> dict:
-        last_message_str = (
-            state.last_message.content.lower()
-            if len(state.messages) == 0
-            else state.messages[-1].content.lower()
-        )
-        possible_output = state.possible_output
+        # Handle union type: state can be InputState or dict
+        if isinstance(state, dict):
+            messages = state.get("messages", [])
+            last_message = state.get("last_message")
+            possible_output = state.get("possible_output", [])
+
+            if len(messages) == 0 and last_message:
+                # Use last_message if available
+                content = (
+                    last_message.get("content", "")
+                    if isinstance(last_message, dict)
+                    else str(last_message)
+                )
+                last_message_str = str(content).lower()
+            elif len(messages) > 0:
+                # Use last message from messages array
+                last_msg = messages[-1]
+                content = (
+                    last_msg.get("content", "")
+                    if isinstance(last_msg, dict)
+                    else str(last_msg)
+                )
+                last_message_str = str(content).lower()
+            elif len(messages) > 0:
+                # Use last message from messages array
+                last_msg = messages[-1]
+                content = (
+                    last_msg.get("content", "")
+                    if isinstance(last_msg, dict)
+                    else str(last_msg)
+                )
+                last_message_str = content.lower()
+            else:
+                last_message_str = ""
+        else:
+            # state is InputState
+            if len(state.messages) == 0:
+                content = cast(str, state.last_message.content)
+            else:
+                last_msg = cast(AnyMessage, state.messages[-1])
+                content = cast(str, last_msg.content)
+            last_message_str = content.lower()
+            possible_output = state.possible_output
 
         output_condition = None
         count = 0
         for condition in possible_output:
-            if condition.lower() in last_message_str:
+            if isinstance(condition, str) and condition.lower() in last_message_str:
                 count += 1
                 output_condition = condition
 
