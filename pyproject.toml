@@ -30,6 +30,7 @@ dependencies = [
 # "openapi_client @ file://./ebiose/generated_cloud_sdk"
 [tool.ruff]
 line-length = 88
+target-version = "py312"
 exclude = ["./notebooks/", "./ebiose/generated_cloud_sdk/"]
 
 
@@ -81,6 +82,7 @@ addopts = "-v -s --strict-markers"
 
 [tool.mypy]
 python_version = "3.12"
+python_executable = "python3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

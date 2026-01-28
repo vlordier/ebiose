@@ -18,7 +18,7 @@ from ebiose.core.engines.graph_engine.nodes.routing_node import (
 )
 
 
-def get_all_subclasses(cls: BaseModel) -> list:
+def get_all_subclasses(cls: type) -> list[type]:
     """This function get all subclasses of a class recursively.
 
     Its purpose is to provide the Union type representing all node types, in use in the Graph class.

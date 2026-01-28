@@ -167,7 +167,7 @@ class Graph(BaseModel):
         return edges
 
     @classmethod
-    def __validate_nodes(cls, nodes: list[dict]) -> tuple[list, list] | None:
+    def __validate_nodes(cls, nodes: list[dict]) -> tuple[list, list]:
         validated_nodes = []
         errors = []
 
@@ -267,7 +267,7 @@ class Graph(BaseModel):
         msg = f"Node with id {node_id} not found in the graph"
         raise ValueError(msg)
 
-    def get_last_node_ids(self: Self) -> list[BaseNode]:
+    def get_last_node_ids(self: Self) -> list[str]:
         """Get the ids of the last nodes in the graph.
 
         Returns:
@@ -387,18 +387,21 @@ class Graph(BaseModel):
 
             # Determine the appropriate brackets for the node type
             start_node_block = node_type_display_name.get(
-                start_node.type,
+                start_node.__class__.__name__,
                 "[/{node_name}/]",
             ).format(node_name=start_node_name)
             end_node_block = node_type_display_name.get(
-                end_node.type,
+                end_node.__class__.__name__,
                 "[/{node_name}/]",
             ).format(node_name=end_node_name)
 
-            if edge.is_conditional():
+            if edge.is_conditional() and edge.condition is not None:
                 # replace the [ with #91; and ] with #93; to avoid mermaid syntax error
                 condition = edge.condition.replace("[", "#91;").replace("]", "#93;")
                 mermaid_str += f"\t{start_node_id}{start_node_block} -->|{condition}| {end_node_id}{end_node_block}\n"
+            elif edge.is_conditional():
+                # Fallback for conditional edges with None condition
+                mermaid_str += f"\t{start_node_id}{start_node_block} -->|true| {end_node_id}{end_node_block}\n"
             else:
                 mermaid_str += f"\t{start_node_id}{start_node_block} --> {end_node_id}{end_node_block}\n"
 

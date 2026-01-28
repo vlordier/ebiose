@@ -23,7 +23,9 @@ class CodeNode(BaseNode):
         description="The key in the state where the code is stored",
     )
 
-    async def call_node(self, state: BaseModel | dict) -> dict:
+    async def call_node(
+        self, state: BaseModel | dict, config: BaseModel | None = None
+    ) -> dict:
         """Executes the code from the last message in the state using exec and returns the result."""
         # Retrieve the last message from the state
         last_message = (
@@ -36,6 +38,11 @@ class CodeNode(BaseNode):
             if isinstance(last_message, dict)
             else getattr(last_message, self.code_key)
         )
+
+        # Ensure code is a string
+        if not isinstance(code, str):
+            msg = f"Code must be a string, got {type(code)}"
+            raise TypeError(msg)
 
         # Basic static analysis to prevent dangerous code
         if not self.is_safe_code(code):
@@ -52,7 +59,7 @@ class CodeNode(BaseNode):
         try:
             tree = ast.parse(code)
             for node in ast.walk(tree):
-                if isinstance(node, ast.Import | ast.ImportFrom | ast.Exec):
+                if isinstance(node, ast.Import | ast.ImportFrom):
                     return False
         except SyntaxError:
             return False
