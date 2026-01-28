@@ -38,7 +38,9 @@ class LangGraphRoutingNode(RoutingNode):
     output_state_model: type[BaseModel] = OutputState
 
     def get_messages(
-        self, condition: str, error_message: str | None = None,
+        self,
+        condition: str,
+        error_message: str | None = None,
     ) -> list[AnyMessage]:
         tool_call_id = f"call_{self.id}_{uuid.uuid4()}"[40]
         tool_call = ToolCall(
@@ -74,7 +76,9 @@ class LangGraphRoutingNode(RoutingNode):
         return messages
 
     async def call_node(
-        self, state: BaseModel | dict, runtime: Runtime[BaseModel],
+        self,
+        state: BaseModel | dict,
+        runtime: Runtime[BaseModel],
     ) -> dict:
         last_message_str = (
             state.last_message.content.lower()

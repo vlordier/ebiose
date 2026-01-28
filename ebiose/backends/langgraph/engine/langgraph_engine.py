@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003
-from typing import Self
+from typing import Any, Self
 
 from langfuse import observe
 from langfuse.langchain import CallbackHandler
@@ -90,10 +90,11 @@ class LangGraphEngine(GraphEngine):
         agent_input: BaseModel,
         master_agent_id: str,
         forge_cycle_id: str | None = None,
-        **kwargs: dict[str, any],
+        **_kwargs: dict[str, Any],
     ) -> BaseModel | dict | None:
         final_state = await self.invoke_graph(
-            agent_input, forge_cycle_id=forge_cycle_id,
+            agent_input,
+            forge_cycle_id=forge_cycle_id,
         )
 
         if "output" in final_state and final_state["output"] is not None:
@@ -114,7 +115,9 @@ class LangGraphEngine(GraphEngine):
 
             try:
                 return await structured_output_agent.run(
-                    so_agent_input, master_agent_id, forge_cycle_id=forge_cycle_id,
+                    so_agent_input,
+                    master_agent_id,
+                    forge_cycle_id=forge_cycle_id,
                 )
             except Exception as e:
                 logger.debug(
@@ -140,7 +143,7 @@ class LangGraphEngine(GraphEngine):
 
         self._state = type("State", tuple(base_classes), {})
 
-    def _build_context(self, forge_cycle_id: str | None = None) -> BaseModel:
+    def _build_context(self, _forge_cycle_id: str | None = None) -> BaseModel:
         """Build dynamically the context of the agent with the nodes of the graph."""
         if self._context is not None:
             return self._context

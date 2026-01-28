@@ -213,7 +213,9 @@ class EbioseAPIClient:
     @classmethod
     @_handle_api_errors
     def add_agents_from_forge_cycle(
-        cls, forge_cycle_id: str, agents: list["Agent"],
+        cls,
+        forge_cycle_id: str,
+        agents: list["Agent"],
     ) -> None:
         """Post agents in a forge cycle."""
         agents_data = [
@@ -267,7 +269,10 @@ class EbioseAPIClient:
     @classmethod
     @_handle_api_errors
     def get_agents(
-        cls, ecosystem_id: str, *, return_ids_only: bool,
+        cls,
+        ecosystem_id: str,
+        *,
+        return_ids_only: bool,
     ) -> list["Agent"] | None:
         response = cls._client.list_agents_in_ecosystem(ecosystem_uuid=ecosystem_id)
         if return_ids_only:
@@ -396,7 +401,8 @@ def get_sample_agent() -> "Agent":
 
     class AgentInput(BaseModel):
         math_problem: str = Field(
-            ..., description="The mathematical word problem to solve",
+            ...,
+            description="The mathematical word problem to solve",
         )
 
     class AgentOutput(BaseModel):
@@ -466,7 +472,9 @@ def get_sample_agent() -> "Agent":
     # from verifier to end,  if the condition is correct
     math_graph.add_edge(
         Edge(
-            start_node_id=verifier_node.id, end_node_id=end_node.id, condition="correct",
+            start_node_id=verifier_node.id,
+            end_node_id=end_node.id,
+            condition="correct",
         ),
     )
     # from verifier to solver, if the condition is incorrect

@@ -37,10 +37,12 @@ class LangGraphEngineState(LangGraphEngineInputState, LangGraphEngineOutputState
 
 class LangGraphEngineContext(BaseModel):
     model_endpoint_id: str = Field(
-        ..., description="The id of the model endpoint to use",
+        ...,
+        description="The id of the model endpoint to use",
     )
     output_model: type[BaseModel] | None = Field(
-        default=None, serialization_exclude=True,
+        default=None,
+        serialization_exclude=True,
     )
     shared_context_prompt: str
     recursion_limit: int = Field(default=15)

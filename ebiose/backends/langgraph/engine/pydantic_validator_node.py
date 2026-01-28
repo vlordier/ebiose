@@ -36,7 +36,9 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
     output_state_model: type[BaseModel] = OutputState
 
     def get_messages(
-        self, condition: str, error: Exception | None = None,
+        self,
+        condition: str,
+        error: Exception | None = None,
     ) -> list[AnyMessage]:
         tool_call_id = f"call_{self.id}_{uuid.uuid4()}"[40]
         tool_call = ToolCall(
@@ -72,7 +74,9 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
         return messages
 
     async def call_node(
-        self, state: InputState | dict, runtime: Runtime[BaseModel],
+        self,
+        state: InputState | dict,
+        runtime: Runtime[BaseModel],
     ) -> OutputState:
         try:
             tool_messages = []

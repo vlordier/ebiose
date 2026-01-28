@@ -61,7 +61,10 @@ class AgentEngine(BaseModel):
     ) -> any:
         try:
             return await self._run_implementation(
-                agent_input, master_agent_id, forge_cycle_id, **kwargs,
+                agent_input,
+                master_agent_id,
+                forge_cycle_id,
+                **kwargs,
             )
         except Exception as e:
             raise AgentEngineRunError(

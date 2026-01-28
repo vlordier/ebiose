@@ -23,7 +23,9 @@ def test_cloud_mode_with_provided_base_url():
 
     # Initialize LLMApi
     LLMApi.initialize(
-        mode="cloud", lite_llm_api_key="test-key", lite_llm_api_base=provided_base_url,
+        mode="cloud",
+        lite_llm_api_key="test-key",
+        lite_llm_api_base=provided_base_url,
     )
 
     assert LLMApi.lite_llm_api_base == provided_base_url, (
@@ -32,7 +34,9 @@ def test_cloud_mode_with_provided_base_url():
 
     # Initialize LangGraphLLMApi
     LangGraphLLMApi.initialize(
-        mode="cloud", lite_llm_api_key="test-key", lite_llm_api_base=provided_base_url,
+        mode="cloud",
+        lite_llm_api_key="test-key",
+        lite_llm_api_base=provided_base_url,
     )
 
     assert LangGraphLLMApi.lite_llm_api_base == provided_base_url, (
@@ -55,7 +59,9 @@ def test_cloud_mode_without_base_url():
 
     # Initialize LangGraphLLMApi
     LangGraphLLMApi.initialize(
-        mode="cloud", lite_llm_api_key="test-key", lite_llm_api_base=None,
+        mode="cloud",
+        lite_llm_api_key="test-key",
+        lite_llm_api_base=None,
     )
 
     assert LangGraphLLMApi.lite_llm_api_base is None, (
@@ -78,7 +84,9 @@ def test_local_mode():
 
     # Initialize LangGraphLLMApi
     LangGraphLLMApi.initialize(
-        mode="local", lite_llm_api_key="test-key", lite_llm_api_base=None,
+        mode="local",
+        lite_llm_api_key="test-key",
+        lite_llm_api_base=None,
     )
 
     print(f"LangGraphLLMApi.lite_llm_api_base: {LangGraphLLMApi.lite_llm_api_base}")

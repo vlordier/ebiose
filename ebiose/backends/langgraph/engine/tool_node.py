@@ -46,7 +46,9 @@ class LangGraphToolNode(BaseNode):
         return {tool.name: tool for tool in self.tools}
 
     async def call_node(
-        self, state: InputState, runtime: Runtime[BaseModel],
+        self,
+        state: InputState,
+        runtime: Runtime[BaseModel],
     ) -> OutputState:
         try:
             outputs = []

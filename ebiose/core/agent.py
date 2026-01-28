@@ -82,7 +82,10 @@ class Agent(BaseModel):
         **kwargs: dict[str, any],
     ) -> any:
         return await self.agent_engine.run(
-            input_data, master_agent_id, forge_cycle_id, **kwargs,
+            input_data,
+            master_agent_id,
+            forge_cycle_id,
+            **kwargs,
         )
 
     def update_io_models(

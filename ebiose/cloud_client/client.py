@@ -14,7 +14,10 @@ class EbioseCloudError(Exception):
     """Base exception for EbioseCloud API errors."""
 
     def __init__(
-        self, message, status_code: int | None = None, response_text: str | None = None,
+        self,
+        message,
+        status_code: int | None = None,
+        response_text: str | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
@@ -369,7 +372,8 @@ class EbioseCloudClient:
                 parsed_error = json.loads(response_text)
                 if isinstance(parsed_error, dict):
                     error_details = parsed_error.get(
-                        "detail", parsed_error.get("message", response_text),
+                        "detail",
+                        parsed_error.get("message", response_text),
                     )
             except json.JSONDecodeError:
                 pass
@@ -412,7 +416,9 @@ class EbioseCloudClient:
     def login(self, email: str, password: str) -> LoginOutputModel:
         return LoginOutputModel(
             **self._request(
-                "GET", "/auth/login", params={"email": email, "password": password},
+                "GET",
+                "/auth/login",
+                params={"email": email, "password": password},
             ),
         )
 
@@ -431,7 +437,9 @@ class EbioseCloudClient:
 
     def update_password(self, new_password: str) -> None:
         self._request(
-            "PUT", "/auth/update-password", params={"newPassword": new_password},
+            "PUT",
+            "/auth/update-password",
+            params={"newPassword": new_password},
         )
 
     def refresh_token(self, token: str) -> str:
@@ -455,7 +463,9 @@ class EbioseCloudClient:
         return EcosystemOutputModel(**self._request("GET", f"/ecosystems/{uuid}"))
 
     def update_ecosystem(
-        self, uuid: str, data: EcosystemInputModel,
+        self,
+        uuid: str,
+        data: EcosystemInputModel,
     ) -> EcosystemOutputModel:
         return EcosystemOutputModel(
             **self._request("PUT", f"/ecosystems/{uuid}", json_data=data),
@@ -465,10 +475,14 @@ class EbioseCloudClient:
         self._request("DELETE", f"/ecosystems/{uuid}")
 
     def add_agents_to_ecosystem(
-        self, ecosystem_uuid: str, agents_data: list[AgentInputModel],
+        self,
+        ecosystem_uuid: str,
+        agents_data: list[AgentInputModel],
     ) -> None:
         self._request(
-            "POST", f"/ecosystems/{ecosystem_uuid}/agents", json_data=agents_data,
+            "POST",
+            f"/ecosystems/{ecosystem_uuid}/agents",
+            json_data=agents_data,
         )
 
     def list_agents_in_ecosystem(self, ecosystem_uuid: str) -> list[AgentOutputModel]:
@@ -478,21 +492,30 @@ class EbioseCloudClient:
         ]
 
     def delete_agents_from_ecosystem(
-        self, ecosystem_uuid: str, agent_uuids: list[str],
+        self,
+        ecosystem_uuid: str,
+        agent_uuids: list[str],
     ) -> None:
         self._request(
-            "DELETE", f"/ecosystems/{ecosystem_uuid}/agents", json_data=agent_uuids,
+            "DELETE",
+            f"/ecosystems/{ecosystem_uuid}/agents",
+            json_data=agent_uuids,
         )
 
     def get_agent_in_ecosystem(
-        self, ecosystem_uuid: str, agent_uuid: str,
+        self,
+        ecosystem_uuid: str,
+        agent_uuid: str,
     ) -> AgentOutputModel:
         return AgentOutputModel(
             **self._request("GET", f"/ecosystems/{ecosystem_uuid}/agent/{agent_uuid}"),
         )
 
     def update_agent_in_ecosystem(
-        self, ecosystem_uuid: str, agent_uuid: str, agent_data: AgentInputModel,
+        self,
+        ecosystem_uuid: str,
+        agent_uuid: str,
+        agent_data: AgentInputModel,
     ) -> AgentOutputModel:
         return AgentOutputModel(
             **self._request(
@@ -503,11 +526,15 @@ class EbioseCloudClient:
         )
 
     def add_single_agent_to_ecosystem(
-        self, ecosystem_uuid: str, agent_data: AgentInputModel,
+        self,
+        ecosystem_uuid: str,
+        agent_data: AgentInputModel,
     ) -> AgentOutputModel:
         return AgentOutputModel(
             **self._request(
-                "POST", f"/ecosystems/{ecosystem_uuid}/agent", json_data=agent_data,
+                "POST",
+                f"/ecosystems/{ecosystem_uuid}/agent",
+                json_data=agent_data,
             ),
         )
 
@@ -546,10 +573,14 @@ class EbioseCloudClient:
         )
 
     def end_forge_cycle(
-        self, forge_cycle_uuid: str, agents_data: list[AgentInputModel],
+        self,
+        forge_cycle_uuid: str,
+        agents_data: list[AgentInputModel],
     ) -> None:
         self._request(
-            "POST", f"/forges/cycles/{forge_cycle_uuid}/end", json_data=agents_data,
+            "POST",
+            f"/forges/cycles/{forge_cycle_uuid}/end",
+            json_data=agents_data,
         )
 
     def get_spend(self, forge_cycle_uuid: str) -> ForgeCycleSpendOutputModel:
@@ -558,7 +589,9 @@ class EbioseCloudClient:
         )
 
     def select_agents_for_forge_cycle(
-        self, forge_cycle_uuid: str, nb_agents: int,
+        self,
+        forge_cycle_uuid: str,
+        nb_agents: int,
     ) -> list[AgentOutputModel]:
         return [
             AgentOutputModel(**item)
@@ -570,7 +603,9 @@ class EbioseCloudClient:
         ]
 
     def deduct_compute_banks_for_forge_cycle(
-        self, forge_cycle_uuid: str, deductions: dict[str, float],
+        self,
+        forge_cycle_uuid: str,
+        deductions: dict[str, float],
     ) -> None:
         self._request(
             "POST",
@@ -580,25 +615,35 @@ class EbioseCloudClient:
 
     def record_forge_cycle_usage(self, forge_cycle_uuid: str, cost: float) -> None:
         self._request(
-            "POST", f"/forges/cycles/{forge_cycle_uuid}/usage", params={"cost": cost},
+            "POST",
+            f"/forges/cycles/{forge_cycle_uuid}/usage",
+            params={"cost": cost},
         )
 
     def add_agent_during_forge_cycle(
-        self, forge_cycle_uuid: str, data: AgentInputModel,
+        self,
+        forge_cycle_uuid: str,
+        data: AgentInputModel,
     ) -> AgentOutputModel:
         """New: Corresponds to POST /forges/cycles/{forgeCycleUuid}/agent."""
         return AgentOutputModel(
             **self._request(
-                "POST", f"/forges/cycles/{forge_cycle_uuid}/agent", json_data=data,
+                "POST",
+                f"/forges/cycles/{forge_cycle_uuid}/agent",
+                json_data=data,
             ),
         )
 
     def add_agents_during_forge_cycle(
-        self, forge_cycle_uuid: str, agents_data: list[AgentInputModel],
+        self,
+        forge_cycle_uuid: str,
+        agents_data: list[AgentInputModel],
     ) -> None:
         """New: Corresponds to POST /forges/cycles/{forgeCycleUuid}/agents."""
         self._request(
-            "POST", f"/forges/cycles/{forge_cycle_uuid}/agents", json_data=agents_data,
+            "POST",
+            f"/forges/cycles/{forge_cycle_uuid}/agents",
+            json_data=agents_data,
         )
 
     # --- Logging Endpoint (New) ---
@@ -634,11 +679,16 @@ class EbioseAPIClient:
 
     @classmethod
     def set_client_credentials(
-        cls, base_url: str, api_key: str | None = None, bearer_token: str | None = None,
+        cls,
+        base_url: str,
+        api_key: str | None = None,
+        bearer_token: str | None = None,
     ) -> None:
         """Sets the API client credentials."""
         cls._client = EbioseCloudClient(
-            base_url=base_url, api_key=api_key, bearer_token=bearer_token,
+            base_url=base_url,
+            api_key=api_key,
+            bearer_token=bearer_token,
         )
         logger.debug(f"EbioseCloudClient initialized for base URL: {base_url}")
 
@@ -672,7 +722,9 @@ class EbioseAPIClient:
     @classmethod
     def add_new_api_key(cls, data: ApiKeyInputModel) -> bool:
         return cls._handle_request(
-            "add new API key", cls._get_client().add_api_key, data=data,
+            "add new API key",
+            cls._get_client().add_api_key,
+            data=data,
         )
 
     # --- Forge Facade (with new methods) ---
@@ -683,7 +735,9 @@ class EbioseAPIClient:
     @classmethod
     def add_new_forge(cls, data: ForgeInputModel) -> ForgeOutputModel:
         return cls._handle_request(
-            "add new forge", cls._get_client().add_forge, data=data,
+            "add new forge",
+            cls._get_client().add_forge,
+            data=data,
         )
 
     @classmethod
@@ -728,7 +782,9 @@ class EbioseAPIClient:
 
     @classmethod
     def conclude_forge_cycle(
-        cls, forge_cycle_uuid: str, agents_data: list[AgentInputModel],
+        cls,
+        forge_cycle_uuid: str,
+        agents_data: list[AgentInputModel],
     ) -> None:
         return cls._handle_request(
             f"end forge cycle {forge_cycle_uuid}",
@@ -756,7 +812,9 @@ class EbioseAPIClient:
 
     @classmethod
     def pick_agents_for_forge_cycle(
-        cls, forge_cycle_uuid: str, nb_agents: int,
+        cls,
+        forge_cycle_uuid: str,
+        nb_agents: int,
     ) -> list[AgentOutputModel]:
         return cls._handle_request(
             f"select agents for forge cycle {forge_cycle_uuid}",
@@ -767,7 +825,9 @@ class EbioseAPIClient:
 
     @classmethod
     def make_deduct_compute_banks_for_forge_cycle(
-        cls, forge_cycle_uuid: str, deductions: dict[str, float],
+        cls,
+        forge_cycle_uuid: str,
+        deductions: dict[str, float],
     ) -> None:
         return cls._handle_request(
             f"deduct compute banks for forge cycle {forge_cycle_uuid}",
@@ -778,7 +838,9 @@ class EbioseAPIClient:
 
     @classmethod
     def add_agent_during_cycle(
-        cls, forge_cycle_uuid: str, agent_data: AgentInputModel,
+        cls,
+        forge_cycle_uuid: str,
+        agent_data: AgentInputModel,
     ) -> AgentOutputModel:
         """Adds a single agent during an active forge cycle."""
         return cls._handle_request(
@@ -790,7 +852,9 @@ class EbioseAPIClient:
 
     @classmethod
     def add_agents_during_cycle(
-        cls, forge_cycle_uuid: str, agents_data: list[AgentInputModel],
+        cls,
+        forge_cycle_uuid: str,
+        agents_data: list[AgentInputModel],
     ) -> None:
         """Adds multiple agents during an active forge cycle."""
         return cls._handle_request(

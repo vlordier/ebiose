@@ -25,7 +25,8 @@ The message is:
 
 
 def init_structured_output_agent(
-    output_model: type[BaseModel], model_endpoint_id: str,
+    output_model: type[BaseModel],
+    model_endpoint_id: str,
 ) -> None:
     from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
     from ebiose.core.agent import Agent
@@ -48,7 +49,8 @@ def init_structured_output_agent(
     )
 
     pydantic_validator_node = LangGraphPydanticValidatorNode(
-        id="validator_node", name="validator_node",
+        id="validator_node",
+        name="validator_node",
     )
 
     start_node = StartNode()
@@ -66,7 +68,8 @@ def init_structured_output_agent(
     )
     graph.add_edge(
         Edge(
-            start_node_id=llm_formatter_node.id, end_node_id=pydantic_validator_node.id,
+            start_node_id=llm_formatter_node.id,
+            end_node_id=pydantic_validator_node.id,
         ),
     )
     graph.add_edge(

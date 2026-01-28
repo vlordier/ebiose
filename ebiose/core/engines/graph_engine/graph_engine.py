@@ -52,12 +52,15 @@ class GraphEngine(AgentEngine):
         )
 
     def _validate_input_output_models(
-        self, model_name: str, io_model: dict | type[BaseModel],
+        self,
+        model_name: str,
+        io_model: dict | type[BaseModel],
     ) -> type[BaseModel]:
         # validate input_model and output_model
         if isinstance(io_model, dict):
             return create_pydantic_model_from_schema(
-                schema=io_model, model_name=model_name,
+                schema=io_model,
+                model_name=model_name,
             )
         if issubclass(io_model, BaseModel):
             return io_model
@@ -66,7 +69,8 @@ class GraphEngine(AgentEngine):
         raise ValueError(msg)
 
     def _serialize_input_output_models(
-        self, io_model: type[BaseModel],
+        self,
+        io_model: type[BaseModel],
     ) -> dict[str, any]:
         io_model_dict = {"name": io_model.__name__, "fields": {}}
         for field_name, field in io_model.model_fields.items():

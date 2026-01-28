@@ -56,7 +56,9 @@ class AgentForge(BaseModel):
 
     @abstractmethod
     async def compute_fitness(
-        self, agent: Agent, **kwargs: dict[str, any],
+        self,
+        agent: Agent,
+        **kwargs: dict[str, any],
     ) -> tuple[str, float]:
         pass
 
@@ -70,7 +72,9 @@ class AgentForge(BaseModel):
         return await cycle.execute_a_cycle(ecosystem)
 
     def display_results(
-        self, agents: dict[str, Agent], agents_fitness: dict[str, float],
+        self,
+        agents: dict[str, Agent],
+        agents_fitness: dict[str, float],
     ) -> None:
         sorted_fitness = dict(
             sorted(agents_fitness.items(), key=lambda item: item[1], reverse=True),

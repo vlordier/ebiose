@@ -25,7 +25,9 @@ class LangGraphAgentNode(AgentNode):
     output_state_model: type[BaseModel] = OutputState
 
     async def call_node(
-        self, state: InputState, runtime: Runtime[BaseModel],
+        self,
+        state: InputState,
+        _runtime: Runtime[BaseModel],
     ) -> OutputState:  # type: ignore  # noqa: PGH003
         agent_input = self.agent.agent_engine.input_model.model_validate(
             state.model_dump(),

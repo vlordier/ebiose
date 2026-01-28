@@ -27,5 +27,8 @@ class LLMApiFactory:
         from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
 
         return LangGraphLLMApi.initialize(
-            mode, lite_llm_api_key, lite_llm_api_base, llm_api_config,
+            mode,
+            lite_llm_api_key,
+            lite_llm_api_base,
+            llm_api_config,
         )

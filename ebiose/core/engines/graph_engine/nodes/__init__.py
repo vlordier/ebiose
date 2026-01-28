@@ -63,7 +63,8 @@ def get_node_types_docstrings(node_types_names: list) -> str:
 
 
 def get_n_llm_nodes_constraint_string(
-    random_n_llm_nodes: bool, max_llm_nodes: int,
+    random_n_llm_nodes: bool,
+    max_llm_nodes: int,
 ) -> str:
     """Get the constraint string for the number of LLM nodes in the graph."""
     if random_n_llm_nodes:

@@ -47,7 +47,9 @@ class MathLangGraphForge(AgentForge):
     @model_validator(mode="after")
     def _load_data(self) -> Self:
         for name, path in zip(
-            ["train", "test"], [self.train_csv_path, self.test_csv_path], strict=True,
+            ["train", "test"],
+            [self.train_csv_path, self.test_csv_path],
+            strict=True,
         ):
             with Path.open(path, "r") as csvfile:
                 reader = csv.DictReader(csvfile)

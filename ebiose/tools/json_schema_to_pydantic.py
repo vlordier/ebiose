@@ -223,7 +223,8 @@ def _create_model_recursive(
         _MODEL_CACHE[model_name] = ForwardRef(model_name)
         # Also update _DEFS_CACHE if this name corresponds to a definition key
         if model_name in _DEFS_CACHE and isinstance(
-            _DEFS_CACHE.get(model_name), ForwardRef,
+            _DEFS_CACHE.get(model_name),
+            ForwardRef,
         ):
             _DEFS_CACHE[model_name] = _MODEL_CACHE[model_name]
 
@@ -419,12 +420,16 @@ def create_pydantic_model_from_schema(
                 f"Top-level model '{top_level_model_name}' was a ForwardRef, creating now.",
             )
             final_model = _create_model_recursive(
-                top_level_model_name, schema, recursion_depth=0,
+                top_level_model_name,
+                schema,
+                recursion_depth=0,
             )
     else:
         # Create the top-level model using the main schema content
         final_model = _create_model_recursive(
-            top_level_model_name, schema, recursion_depth=0,
+            top_level_model_name,
+            schema,
+            recursion_depth=0,
         )
 
     # --- Step 3: Final model rebuild (Optional but can catch stragglers) ---
@@ -572,7 +577,8 @@ if __name__ == "__main__":
 
         # Provide explicit name to avoid potential conflicts if running multiple times
         ReconstructedDept = create_pydantic_model_from_schema(
-            dept_schema, model_name="ReconstructedDept",
+            dept_schema,
+            model_name="ReconstructedDept",
         )
         print(f"Successfully reconstructed model: {ReconstructedDept.__name__}")
 
@@ -597,7 +603,8 @@ if __name__ == "__main__":
         )  # Name from schema $defs
 
         if isinstance(reconstructed_employee_type, type) and issubclass(
-            reconstructed_employee_type, BaseModel,
+            reconstructed_employee_type,
+            BaseModel,
         ):
             print(
                 f"\n--- Reconstructed Employee (from Cache: {reconstructed_employee_type.__name__}) Fields ---",

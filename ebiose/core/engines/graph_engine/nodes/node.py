@@ -26,7 +26,9 @@ class BaseNode(BaseModel):
 
     @abstractmethod  # Must be implemented
     async def call_node(
-        self, state: BaseModel | dict, config: BaseModel | None = None,
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
     ) -> dict:
         pass
 
@@ -48,7 +50,9 @@ class StartNode(BaseNode):
     type: Literal["StartNode"] = "StartNode"
 
     async def call_node(
-        self, state: BaseModel | dict, config: BaseModel | None = None,
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
     ) -> dict:
         pass
 
@@ -72,6 +76,8 @@ class EndNode(BaseNode):
     type: Literal["EndNode"] = "EndNode"
 
     async def call_node(
-        self, state: BaseModel | dict, config: BaseModel | None = None,
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
     ) -> dict:
         pass

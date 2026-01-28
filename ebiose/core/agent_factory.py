@@ -161,7 +161,9 @@ class AgentFactory:
         from ebiose.core.agent_engine_factory import AgentEngineFactory  # Local import
 
         output = await crossover_agent.run(
-            input_data, master_agent_id=master_agent_id, forge_cycle_id=forge_cycle_id,
+            input_data,
+            master_agent_id=master_agent_id,
+            forge_cycle_id=forge_cycle_id,
         )
         try:
             agent_name = forge_description

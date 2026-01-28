@@ -86,7 +86,10 @@ class LangGraphLLMApi(LLMApi):
 
     @classmethod
     def _get_llm(
-        cls, model_endpoint_id: str, temperature: float, max_tokens: int,
+        cls,
+        model_endpoint_id: str,
+        temperature: float,
+        max_tokens: int,
     ) -> AzureChatOpenAI:
         """Get the LLM model from the model endpoint id.
 
@@ -272,16 +275,22 @@ class LangGraphLLMApi(LLMApi):
         try:
             # Record the request and tokens
             response = await cls._call_llm(
-                model_endpoint_id, messages, temperature, max_tokens, tools,
+                model_endpoint_id,
+                messages,
+                temperature,
+                max_tokens,
+                tools,
             )
             if response is None:
                 return None
 
             completion_tokens = response.response_metadata["token_usage"].get(
-                "completion_tokens", 0,
+                "completion_tokens",
+                0,
             )
             prompt_tokens = response.response_metadata["token_usage"].get(
-                "prompt_tokens", 0,
+                "prompt_tokens",
+                0,
             )
 
             cost = cost_per_token(

@@ -197,7 +197,8 @@ class ForgeCycle:
         return "standard"
 
     def get_agents_by_type(
-        self, agent_type: Literal["architect", "crossover", "mutation", "standard"],
+        self,
+        agent_type: Literal["architect", "crossover", "mutation", "standard"],
     ) -> dict[str, Agent]:
         if agent_type == "architect":
             return self.architect_agents
@@ -210,7 +211,8 @@ class ForgeCycle:
         }
 
     async def initialize_population(
-        self, ecosystem: Ecosystem,
+        self,
+        ecosystem: Ecosystem,
     ) -> None:  # Removed quotes from Ecosystem type hint
         logger.info("****** Initializing agents population ******")
         remaining_budget, initial_budget = self.get_budget_info()
@@ -630,7 +632,9 @@ class ForgeCycle:
         for agent in self.agents.values():
             task = asyncio.create_task(
                 self.forge.compute_fitness(
-                    agent, generation=self.cur_generation, forge_cycle_id=self.id,
+                    agent,
+                    generation=self.cur_generation,
+                    forge_cycle_id=self.id,
                 ),
             )
             tasks.append(task)
@@ -770,7 +774,8 @@ class ForgeCycle:
                 tournament_agents += [agents[0]] * (tournament_size - 1)
             else:
                 tournament_agents += random.sample(
-                    agents[:i] + agents[i + 1 :], tournament_size - 1,
+                    agents[:i] + agents[i + 1 :],
+                    tournament_size - 1,
                 )
             tournament_fitness = [
                 self.agents_fitness[agent.id] for agent in tournament_agents
@@ -798,7 +803,8 @@ class ForgeCycle:
         return selected_ids
 
     async def crossover_and_mutate(
-        self, selected_parent_ids: list[str],
+        self,
+        selected_parent_ids: list[str],
     ) -> tuple[list[Agent], float]:
         remaining_budget, initial_budget = self.get_budget_info()
         CrossoverAndMutationStartedEvent(

@@ -61,7 +61,9 @@ class Ecosystem(BaseModel):
         return None
 
     async def select_agents_for_forge(
-        self, forge: AgentForge, n_agents: int,
+        self,
+        forge: AgentForge,
+        n_agents: int,
     ) -> list[Agent]:
         self.add_forge(forge)
         if n_agents <= 0:
@@ -83,7 +85,8 @@ class Ecosystem(BaseModel):
                 (
                     agent,
                     embedding_distance(
-                        agent.description_embedding, forge.description_embedding,
+                        agent.description_embedding,
+                        forge.description_embedding,
                     ),
                 )
                 for agent in self.agents.values()
@@ -94,7 +97,8 @@ class Ecosystem(BaseModel):
     def _add_new_born_agent(self, new_agent: Agent) -> None:
         for forge in self.forge_list:
             distance = embedding_distance(
-                new_agent.description_embedding, forge.description_embedding,
+                new_agent.description_embedding,
+                forge.description_embedding,
             )
             self.agent_forge_distances[forge.id].add((new_agent, distance))
 
