@@ -53,10 +53,10 @@ def get_path(conditional_edges: list[Edge], end_node_id: str) -> callable:
     Returns:
         callable: Function to determine the next node.
     """
-    start_node_id = {edge.start_node_id for edge in conditional_edges}
-    if len(start_node_id) > 1:
-        raise NodesCoherenceError(start_node_id)
-    start_node_id = start_node_id.pop()
+    start_node_ids = {edge.start_node_id for edge in conditional_edges}
+    if len(start_node_ids) > 1:
+        raise NodesCoherenceError(start_node_ids)
+    start_node_id = start_node_ids.pop()
 
     async def path(state: BaseModel, runtime: Runtime[BaseModel]) -> str:
         condition = None

@@ -174,7 +174,7 @@ def _get_python_type(  # type: ignore[return]
     actual_types = tuple(t for t in possible_types if t is not type(None))
 
     if not actual_types:
-        return type(None)  # type: ignore[return]  # Only None/null was possible
+        return type(None)  # Only None/null was possible
     if len(actual_types) == 1:
         final_type = actual_types[0]
         if has_null:

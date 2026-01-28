@@ -5,6 +5,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import json
 
@@ -71,11 +72,19 @@ class GraphEngine(AgentEngine):
     def _serialize_input_output_models(
         self,
         io_model: type[BaseModel],
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         io_model_dict = {"name": io_model.__name__, "fields": {}}
         for field_name, field in io_model.model_fields.items():
+            annotation_name = "Any"
+            if field.annotation:
+                try:
+                    annotation_name = getattr(
+                        field.annotation, "__name__", str(field.annotation)
+                    )
+                except AttributeError:
+                    annotation_name = str(field.annotation)
             io_model_dict["fields"][field_name] = (
-                field.annotation.__name__,
+                annotation_name,
                 {"description": field.description},
             )
         return io_model_dict
