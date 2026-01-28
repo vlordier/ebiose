@@ -25,7 +25,9 @@ class BaseNode(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @abstractmethod  # Must be implemented
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
+    async def call_node(
+        self, state: BaseModel | dict, config: BaseModel | None = None,
+    ) -> dict:
         pass
 
 
@@ -45,7 +47,9 @@ class StartNode(BaseNode):
     name: str = Field(default="start_node")
     type: Literal["StartNode"] = "StartNode"
 
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
+    async def call_node(
+        self, state: BaseModel | dict, config: BaseModel | None = None,
+    ) -> dict:
         pass
 
 
@@ -67,5 +71,7 @@ class EndNode(BaseNode):
     name: str = Field(default="end_node")
     type: Literal["EndNode"] = "EndNode"
 
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
+    async def call_node(
+        self, state: BaseModel | dict, config: BaseModel | None = None,
+    ) -> dict:
         pass

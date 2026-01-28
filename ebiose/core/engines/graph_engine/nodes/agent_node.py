@@ -16,7 +16,6 @@ from ebiose.core.engines.graph_engine.nodes.node import BaseNode
 
 
 class AgentNode(BaseNode, abc.ABC):
-
     type: Literal["AgentNode"] = "AgentNode"
     name: str = Field(default_factory=lambda: id)  # if name isn't provided, use id
     # TODO(xabier): agent_id instead of agent, as agent embeds the agent_engine for now
@@ -31,7 +30,9 @@ class AgentNode(BaseNode, abc.ABC):
 
     # TODO(issue):  abstract class
     # https://github.com/ebiose-ai/ebiose/issues/44
-    async def call_node(self, agent_state: BaseModel | dict, config: BaseModel | None = None) -> dict:
+    async def call_node(
+        self, agent_state: BaseModel | dict, config: BaseModel | None = None,
+    ) -> dict:
         """Basic call_node where there is only a common prompt in the graph and a list of messages where there are additively stacked."""
         msg = "This method depends on the backend used to call the LLM model"
         raise NotImplementedError(

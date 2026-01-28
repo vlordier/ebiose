@@ -12,11 +12,8 @@ from typing import Literal
 
 from loguru import logger
 
-from ebiose.core.llm_api_factory import LLMApiFactory
-from ebiose.core.llm_api import (
-    LLMApi,
-)
 from ebiose.core.agent_factory import AgentFactory
+from ebiose.core.llm_api_factory import LLMApiFactory
 from examples.math_forge.math_forge import MathLangGraphForge
 
 
@@ -28,7 +25,6 @@ def main(
     model_endpoint_id: str,
     mode: Literal["local", "cloud"] = "cloud",
 ) -> None:
-
     # instantiating the forge
     forge = MathLangGraphForge(
         train_csv_path=train_csv_path,
@@ -48,7 +44,7 @@ def main(
 
     # generating the compute token
     llm_api = LLMApiFactory.initialize(mode=mode)
-    
+
     # running evaluation on test set
     t0 = datetime.now(UTC)
     fitness = asyncio.run(
@@ -61,22 +57,24 @@ def main(
     # getting cost
     cost = llm_api.get_total_cost()
 
-    logger.info(f"Evaluation of agent {agent.id} on test set took {datetime.now(UTC) - t0}")
+    logger.info(
+        f"Evaluation of agent {agent.id} on test set took {datetime.now(UTC) - t0}",
+    )
     logger.info(f"Computed fitness is: {fitness}, for cost: {cost} $")
 
 
 if __name__ == "__main__":
-
     # loading dotenv
     from dotenv import load_dotenv
+
     load_dotenv()
 
     # evaluation parameters
     AGENT_JSON_FILE = "data/2025-06-22_13-53-54/generation=1/agents/agent-ff27cdb8-972a-4e4e-bd47-533293130919.json"
-    TRAIN_CSV_PATH = "./examples/math_forge/gsm8k_train.csv" # the train dataset
-    TEST_CSV_PATH = "./examples/math_forge/gsm8k_test.csv" # the test dataset
-    N_PROBLEMS = 2 # number of problems to evaluate on
-    MODEL_ENDPOINT_ID = "azure/gpt-4o-mini" # model endpoint id
+    TRAIN_CSV_PATH = "./examples/math_forge/gsm8k_train.csv"  # the train dataset
+    TEST_CSV_PATH = "./examples/math_forge/gsm8k_test.csv"  # the test dataset
+    N_PROBLEMS = 2  # number of problems to evaluate on
+    MODEL_ENDPOINT_ID = "azure/gpt-4o-mini"  # model endpoint id
 
     # running the evaluation
     main(

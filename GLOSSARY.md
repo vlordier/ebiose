@@ -1,6 +1,6 @@
 # Glossary
 
-Ebiose comes with its own terminology inspired by both AI and natural evolution.  
+Ebiose comes with its own terminology inspired by both AI and natural evolution.
 Here are defined the main terms used throughout the project.
 
 ### 🤖 Agent
@@ -15,7 +15,7 @@ The Agent Engine is the central engine responsible for managing and executing an
 
 **Future Scalability and Compatibility**: Ebiose supports the simultaneous integration of multiple Agent Engines. These engines can coexist and collaborate in the same environment. It will thus be possible to integrate popular frameworks such as Autogen or CrewAI or even develop custom Agent Engines.
 
-### 🕸️ Graph-Based Agent Engine 
+### 🕸️ Graph-Based Agent Engine
 
 We have implemented a first agent engine in the form of a graph:
 
@@ -35,17 +35,17 @@ We have implemented a first agent engine in the form of a graph:
 - Conditional branching
 - Conditional loops on the same node
 
-### 👷 Architect Agent 
+### 👷 Architect Agent
 
 A **specialized agent** whose objective is to design, create, and evolve other agents within dedicated forges. Architect agents select and assemble existing building blocks to craft new agents and reusable components, fueling the continuous innovation and evolution of the Ebiose ecosystem.
 
 A **specialized type of agent** whose objective is to design, create, and evolve other agents within forges. Agent Architects select and assemble existing building blocks to create new agents and reusable components, thereby contributing to the continuous improvement of the entire biosphere.
 
-### 🌐 Ecosystem 
+### 🌐 Ecosystem
 
 A distributed and living environment where agents evolve and compete, architect agents craft new agents in isolated "forges" by utilizing a shared library of reusable building blocks. Users contribute by proposing new challenges or interacting with existing agents.
 
-### 🌎 Ebiose Biosphere 
+### 🌎 Ebiose Biosphere
 
 An **interconnected network** of all Ebiose ecosystems. Like the Earth’s biosphere, it forms a global system in which innovations, agents, and knowledge can circulate and evolve. This artificial biosphere is a **dynamic, living environment**, continuously enriched through multi-level interactions among ecosystems, agents, and humans.
 

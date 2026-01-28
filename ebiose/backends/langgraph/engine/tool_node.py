@@ -5,32 +5,29 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+
 import json
-import traceback
 from typing import Literal
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import ToolMessage
+from langgraph.runtime import Runtime
 from loguru import logger
 from pydantic import BaseModel, Field, computed_field
 
-from ebiose.backends.langgraph.llm_api import (
-    LangGraphLLMApi,
-)
 from ebiose.backends.langgraph.engine.states import (
     LangGraphEngineInputState,
     LangGraphEngineOutputState,
 )
-from langgraph.runtime import Runtime
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import BaseNode
-from ebiose.core.engines.graph_engine.utils import get_placeholders
 
 
 class InputState(LangGraphEngineInputState):
     pass
 
+
 class OutputState(LangGraphEngineOutputState):
     pass
+
 
 class LangGraphToolNode(BaseNode):
     tools: list = Field(default_factory=list)
@@ -43,17 +40,20 @@ class LangGraphToolNode(BaseNode):
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
-
     @computed_field
     def tools_by_name(self) -> dict:
         """Returns a dictionary mapping tool names to their respective Tool objects."""
         return {tool.name: tool for tool in self.tools}
 
-    async def call_node(self, state: InputState, runtime: Runtime[BaseModel]) -> OutputState:
+    async def call_node(
+        self, state: InputState, runtime: Runtime[BaseModel],
+    ) -> OutputState:
         try:
             outputs = []
             for tool_call in state["messages"][-1].tool_calls:
-                tool_result = self.tools_by_name[tool_call["name"]].invoke(tool_call["args"])
+                tool_result = self.tools_by_name[tool_call["name"]].invoke(
+                    tool_call["args"],
+                )
                 outputs.append(
                     ToolMessage(
                         content=json.dumps(tool_result),

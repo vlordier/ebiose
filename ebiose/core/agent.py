@@ -6,13 +6,10 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-import traceback
 import uuid
 from typing import Literal, Self
 
 from langfuse import observe
-
-from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from pydantic.alias_generators import to_camel
 
@@ -26,9 +23,11 @@ class Agent(BaseModel):
     name: str
     agent_type: Literal["architect", "genetic_operator"] | None = None
     description: str | None = None
-    architect_agent_id: str | None = None 
-    genetic_operator_agent_id: str | None = None  #
-    architect_agent: Agent | None = None  # Reference to the architect agent if this is a generated agent
+    architect_agent_id: str | None = None
+    genetic_operator_agent_id: str | None = None
+    architect_agent: Agent | None = (
+        None  # Reference to the architect agent if this is a generated agent
+    )
     parent_ids: list[str] = Field(default_factory=list)
 
     agent_engine: AgentEngine | None = Field(default=None)
@@ -36,13 +35,15 @@ class Agent(BaseModel):
 
     model_config = ConfigDict(
         alias_generator=to_camel,
-        populate_by_name=True, # Allows initializing with snake_case names
+        populate_by_name=True,  # Allows initializing with snake_case names
     )
 
     @field_serializer("agent_engine")
     def serialize_agent_engine(self, agent_engine: AgentEngine | None) -> dict:
         if agent_engine is not None:
-            return agent_engine.model_dump(by_alias=True) # TODO(xabier): remove by_alias ?
+            return agent_engine.model_dump(
+                by_alias=True,
+            )  # TODO(xabier): remove by_alias ?
         return {}
 
     @model_validator(mode="before")
@@ -73,8 +74,16 @@ class Agent(BaseModel):
         return self
 
     @observe(name="run_agent")
-    async def run(self, input_data: BaseModel, master_agent_id: str, forge_cycle_id: str | None = None, **kwargs: dict[str, any]) -> any:
-        return await self.agent_engine.run(input_data, master_agent_id, forge_cycle_id, **kwargs)
+    async def run(
+        self,
+        input_data: BaseModel,
+        master_agent_id: str,
+        forge_cycle_id: str | None = None,
+        **kwargs: dict[str, any],
+    ) -> any:
+        return await self.agent_engine.run(
+            input_data, master_agent_id, forge_cycle_id, **kwargs,
+        )
 
     def update_io_models(
         self,

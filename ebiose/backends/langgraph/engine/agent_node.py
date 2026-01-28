@@ -6,23 +6,27 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
+from langgraph.runtime import Runtime
 from pydantic import BaseModel
 
 from ebiose.core.engines.graph_engine.nodes.agent_node import AgentNode
-from langgraph.runtime import Runtime
+
 
 class InputState(BaseModel):
     pass
 
+
 class OutputState(BaseModel):
     pass
 
-class LangGraphAgentNode(AgentNode):
 
+class LangGraphAgentNode(AgentNode):
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
-    async def call_node(self, state: InputState, runtime: Runtime[BaseModel]) -> OutputState: # type: ignore  # noqa: PGH003
+    async def call_node(
+        self, state: InputState, runtime: Runtime[BaseModel],
+    ) -> OutputState:  # type: ignore  # noqa: PGH003
         agent_input = self.agent.agent_engine.input_model.model_validate(
             state.model_dump(),
         )
@@ -30,4 +34,3 @@ class LangGraphAgentNode(AgentNode):
 
         # TODO(xabier): return also a tool message
         return response.model_dump()
-

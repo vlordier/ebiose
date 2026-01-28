@@ -4,15 +4,10 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
-import uuid
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel
 
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
-from ebiose.core.engines.graph_engine.nodes import (
-    get_node_types_docstrings,
-    node_types_names,
-)
 from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
@@ -30,8 +25,10 @@ class AgentInput(BaseModel):
     # def node_types_description(self) -> str:
     #     return get_node_types_docstrings(self.node_types)
 
+
 class AgentOutput(Graph):
     pass
+
 
 SHARED_CONTEXT_PROMPT = """As an expert in Machine Learning, deeply immersed in the most
 recent advancements in prompt engineering and the innovative application of LLMs, your
@@ -69,9 +66,9 @@ Conditional edges must obey the following rules:\n- There can only be one condit
 
 MUTATION_PROMPT = """The graph to be mutated is the following:
 {parent_configuration}
-You can modify the graph structure by removing or adding one or more LLM nodes. 
-The goal of this mutation is to improve the model's performance by exploring new avenues. 
-If necessary, you can also modify any field of 
+You can modify the graph structure by removing or adding one or more LLM nodes.
+The goal of this mutation is to improve the model's performance by exploring new avenues.
+If necessary, you can also modify any field of
 other existing nodes and edges.
 You may also only improve the prompts of the existing nodes, or the conditions of the edges.
 Be creative in your approach, leveraging the unique capabilities of each parent graph to enhance the overall
@@ -79,9 +76,10 @@ problem-solving capacity of the offspring graph.\n
 Create the offspring graph now and return it into the same format as its parents.",
 """
 
+
 def init_mutation_agent(model_endpoint_id: str | None) -> None:
-    from ebiose.core.agent import Agent
     from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
+    from ebiose.core.agent import Agent
 
     mutation_node = LLMNode(
         id="mutation",
@@ -105,7 +103,11 @@ def init_mutation_agent(model_endpoint_id: str | None) -> None:
     )
 
     graph.add_edge(
-        Edge(start_node_id=mutation_node.id, end_node_id=end_node.id, condition="not_found"),
+        Edge(
+            start_node_id=mutation_node.id,
+            end_node_id=end_node.id,
+            condition="not_found",
+        ),
     )
 
     agent_id = "agent-b0d53155-4525-4d4a-92c8-145426f4a4bf"
@@ -116,7 +118,7 @@ def init_mutation_agent(model_endpoint_id: str | None) -> None:
         model_endpoint_id=model_endpoint_id,
         input_model=AgentInput,
         output_model=AgentOutput,
-        tags = ["mutation_agent"],
+        tags=["mutation_agent"],
     )
 
     return Agent(

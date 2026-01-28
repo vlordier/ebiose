@@ -131,4 +131,3 @@ If you have any questions or need help, feel free to:
 - Reach out to the maintainers directly.
 
 Happy contributing! 🎉
-

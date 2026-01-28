@@ -18,11 +18,14 @@ class LLMApiFactory:
     @classmethod
     def initialize(
         cls,
-        mode: Literal["local", "cloud"], 
-        lite_llm_api_key: str | None = None, 
+        mode: Literal["local", "cloud"],
+        lite_llm_api_key: str | None = None,
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
     ) -> LLMApi:
         """Initialize the LLM API and return the instance."""
         from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
-        return LangGraphLLMApi.initialize(mode, lite_llm_api_key, lite_llm_api_base, llm_api_config)
+
+        return LangGraphLLMApi.initialize(
+            mode, lite_llm_api_key, lite_llm_api_base, llm_api_config,
+        )

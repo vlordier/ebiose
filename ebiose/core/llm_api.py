@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from ebiose.cloud_client.ebiose_api_client import EbioseAPIClient
 from ebiose.core.model_endpoint import ModelEndpoints
 
-
 if TYPE_CHECKING:
     from langchain_core.messages import AnyMessage
 
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
 class LLMAPIConfig(BaseModel):
     request_timeout_in_minutes: float = 2.0
     max_retries: int = 1
+
 
 class LLMApi(ABC):
     _llm_api_config: LLMAPIConfig = LLMAPIConfig()
@@ -34,14 +34,14 @@ class LLMApi(ABC):
     @classmethod
     def initialize(
         cls,
-        mode: Literal["local", "cloud"], 
-        lite_llm_api_key: str | None = None, 
+        mode: Literal["local", "cloud"],
+        lite_llm_api_key: str | None = None,
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
     ) -> LLMApi:
         cls.mode = mode
         cls.lite_llm_api_key = lite_llm_api_key
-        
+
         # Set lite_llm_api_base based on mode and available configuration
         if lite_llm_api_base is not None:
             # Use provided base URL (typically from cloud API)
@@ -90,7 +90,6 @@ class LLMApi(ABC):
         tools: list | None = None,
     ) -> AnyMessage:
         """Process an LLM call with backend-specific implementation."""
-        pass
 
     @classmethod
     def add_agent_cost(cls, agent_id: str, cost: float) -> None:
@@ -100,4 +99,3 @@ class LLMApi(ABC):
         else:
             cls._cost_per_agent[agent_id] = cost
         cls.update_total_cost(new_cost=cost)
-

@@ -9,11 +9,9 @@ from __future__ import annotations
 from collections.abc import Sequence  # noqa: TC003
 from typing import Self
 
-from langfuse import observe, get_client
-from langfuse import Langfuse
+from langfuse import observe
 from langfuse.langchain import CallbackHandler
-from langgraph.graph import StateGraph
-from langgraph.graph import END, START
+from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from loguru import logger
 from pydantic import (
@@ -22,8 +20,6 @@ from pydantic import (
     PrivateAttr,
     ValidationError,
     create_model,
-    field_serializer,
-    field_validator,
     model_validator,
 )
 
@@ -42,6 +38,7 @@ from ebiose.tools.json_schema_to_pydantic import create_pydantic_model_from_sche
 # langfuse = get_client()
 # langfuse_handler = CallbackHandler()
 
+
 class LangGraphEngine(GraphEngine):
     engine_type: str = "langgraph_engine"
     model_endpoint_id: str | None = None
@@ -52,7 +49,6 @@ class LangGraphEngine(GraphEngine):
     _compiled_graph: Pregel | None = PrivateAttr(None)
     _state: type[BaseModel] | None = PrivateAttr(None)
     _context: BaseModel | None = PrivateAttr(None)
-
 
     @model_validator(mode="after")
     def _set_llm_models(self) -> Self:
@@ -89,12 +85,19 @@ class LangGraphEngine(GraphEngine):
         return self
 
     @observe(name="run_agent_engine")
-    async def _run_implementation(self, agent_input: BaseModel, master_agent_id: str, forge_cycle_id: str | None = None,  **kwargs: dict[str, any]) -> BaseModel | dict | None:
-
-        final_state = await self.invoke_graph(agent_input, forge_cycle_id=forge_cycle_id)
+    async def _run_implementation(
+        self,
+        agent_input: BaseModel,
+        master_agent_id: str,
+        forge_cycle_id: str | None = None,
+        **kwargs: dict[str, any],
+    ) -> BaseModel | dict | None:
+        final_state = await self.invoke_graph(
+            agent_input, forge_cycle_id=forge_cycle_id,
+        )
 
         if "output" in final_state and final_state["output"] is not None:
-            return  final_state["output"]
+            return final_state["output"]
 
         if self.output_model is not None:
             try:
@@ -110,9 +113,13 @@ class LangGraphEngine(GraphEngine):
             )
 
             try:
-                return await structured_output_agent.run(so_agent_input, master_agent_id, forge_cycle_id=forge_cycle_id)
+                return await structured_output_agent.run(
+                    so_agent_input, master_agent_id, forge_cycle_id=forge_cycle_id,
+                )
             except Exception as e:
-                logger.debug(f"Error while running agent {self.agent_id}, when calling structured output agent: {e!s}")
+                logger.debug(
+                    f"Error while running agent {self.agent_id}, when calling structured output agent: {e!s}",
+                )
         else:
             return final_state
 
@@ -157,73 +164,73 @@ class LangGraphEngine(GraphEngine):
 
     @observe(name="invoke_graph")
     async def invoke_graph(
-            self,
-            agent_input: BaseModel,
-            forge_cycle_id: str | None = None,
-        ) -> BaseModel:
-            """Compile and run the agent.
+        self,
+        agent_input: BaseModel,
+        forge_cycle_id: str | None = None,
+    ) -> BaseModel:
+        """Compile and run the agent.
 
-            Args:
-                agent_input: The input that goes in first trough the graph
+        Args:
+            agent_input: The input that goes in first trough the graph
 
-            Returns: the final updated graph state
-            """
-            compiled_graph = await self._compile_graph(forge_cycle_id=forge_cycle_id)
-            initial_state = self._state(
-                input=agent_input,
-                **agent_input.model_dump(),
+        Returns: the final updated graph state
+        """
+        compiled_graph = await self._compile_graph(forge_cycle_id=forge_cycle_id)
+        initial_state = self._state(
+            input=agent_input,
+            **agent_input.model_dump(),
+        )
+
+        node_config = {}
+        for node in self.graph.nodes:
+            outgoing_conditional_edges = self.graph.get_outgoing_edges(
+                node.id,
+                conditional=True,
             )
+            if len(outgoing_conditional_edges) > 0:
+                node_config[node.id] = {
+                    "output_conditions": [
+                        edge.condition for edge in outgoing_conditional_edges
+                    ],
+                }
 
-            node_config = {}
-            for node in self.graph.nodes:
-                outgoing_conditional_edges = self.graph.get_outgoing_edges(
-                    node.id,
-                    conditional=True,
-                )
-                if len(outgoing_conditional_edges) > 0:
-                    node_config[node.id] = {
-                        "output_conditions": [edge.condition for edge in outgoing_conditional_edges],
-                    }
-            
-            langfuse_handler = CallbackHandler()
-            config = {
-                "callbacks": [langfuse_handler],
-                "metadata": {
-                    "langfuse_session_id": str(self.agent_id),
-                    "langfuse_tags": self.tags,
-                    "agent_id": self.agent_id,
-                    "forge_cycle_id": forge_cycle_id,
-                },
-            }
-            
-            context = self._context(
-                shared_context_prompt=self.graph.shared_context_prompt,
-                model_endpoint_id=self.model_endpoint_id,
-                output_model=self.output_model,
-                recursion_limit = self.recursion_limit,
-                forge_cycle_id=forge_cycle_id,
-                **node_config,
-            )
-            
+        langfuse_handler = CallbackHandler()
+        config = {
+            "callbacks": [langfuse_handler],
+            "metadata": {
+                "langfuse_session_id": str(self.agent_id),
+                "langfuse_tags": self.tags,
+                "agent_id": self.agent_id,
+                "forge_cycle_id": forge_cycle_id,
+            },
+        }
 
-            return await compiled_graph.ainvoke(
-                initial_state,
-                config=config,
-                context=context.model_dump(),
-            )
+        context = self._context(
+            shared_context_prompt=self.graph.shared_context_prompt,
+            model_endpoint_id=self.model_endpoint_id,
+            output_model=self.output_model,
+            recursion_limit=self.recursion_limit,
+            forge_cycle_id=forge_cycle_id,
+            **node_config,
+        )
 
-    async def _compile_graph(self, forge_cycle_id: str | None=None) -> Pregel:
-            """Compile the agent into a runnable graph."""
-            if self._compiled_graph is None:
-                self._build_state()
-                self._build_context(forge_cycle_id=forge_cycle_id)
-                self._compiled_graph = await self.__to_compiled_graph()
-            return self._compiled_graph
+        return await compiled_graph.ainvoke(
+            initial_state,
+            config=config,
+            context=context.model_dump(),
+        )
+
+    async def _compile_graph(self, forge_cycle_id: str | None = None) -> Pregel:
+        """Compile the agent into a runnable graph."""
+        if self._compiled_graph is None:
+            self._build_state()
+            self._build_context(forge_cycle_id=forge_cycle_id)
+            self._compiled_graph = await self.__to_compiled_graph()
+        return self._compiled_graph
 
     def __to_workflow(self) -> StateGraph:
-
         workflow = StateGraph(
-            state_schema=self._state, 
+            state_schema=self._state,
             context_schema=self._context,
             # TODO(xabier): test the use of input_model and output_model as I/O schemas
             # input_schema=self.input_model,

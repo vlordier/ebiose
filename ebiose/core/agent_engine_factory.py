@@ -7,25 +7,19 @@ This software is licensed under the MIT License. See LICENSE for details.
 # core/agentEngineFactory.py
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
 from ebiose.core.agent_engine import AgentEngine
 from ebiose.core.model_endpoint import ModelEndpoints
-
-if TYPE_CHECKING:
-    from pydantic import BaseModel
 
 
 class AgentEngineFactory:
     @staticmethod
     def create_engine(
-            engine_type: str,
-            agent_id: str,
-            configuration: dict,
-            model_endpoint_id: str | None = None,
-        ) -> AgentEngine:
-
+        engine_type: str,
+        agent_id: str,
+        configuration: dict,
+        model_endpoint_id: str | None = None,
+    ) -> AgentEngine:
         if engine_type == "langgraph_engine":
             if model_endpoint_id is None:
                 model_endpoint_id = ModelEndpoints.get_default_model_endpoint_id()

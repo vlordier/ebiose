@@ -6,10 +6,10 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from collections.abc import Sequence  # noqa: TC003
+from collections.abc import Sequence
 from typing import Annotated
 
-from langchain_core.messages import AnyMessage  # noqa: TC002
+from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field, computed_field
 
@@ -18,6 +18,7 @@ class LangGraphEngineInputState(BaseModel):
     messages: Annotated[Sequence[AnyMessage], add_messages] = []
     input: BaseModel
     error_message: str = ""
+
 
 class LangGraphEngineOutputState(BaseModel):
     messages: Annotated[Sequence[AnyMessage], add_messages] = []
@@ -33,9 +34,14 @@ class LangGraphEngineOutputState(BaseModel):
 class LangGraphEngineState(LangGraphEngineInputState, LangGraphEngineOutputState):
     pass
 
+
 class LangGraphEngineContext(BaseModel):
-    model_endpoint_id: str = Field(..., description="The id of the model endpoint to use")
-    output_model: type[BaseModel] | None = Field(default=None, serialization_exclude=True)
+    model_endpoint_id: str = Field(
+        ..., description="The id of the model endpoint to use",
+    )
+    output_model: type[BaseModel] | None = Field(
+        default=None, serialization_exclude=True,
+    )
     shared_context_prompt: str
     recursion_limit: int = Field(default=15)
     tags: list[str] = Field(default_factory=list)

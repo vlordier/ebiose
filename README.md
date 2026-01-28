@@ -23,7 +23,7 @@ Ebiose is a **distributed artificial intelligence factory**, an open source proj
 
 > "AI is set to reshape our world, but who gets to decide its form and for whose benefit? Instead of a future dictated by a few tech giants, what if we could build AI collectively and openly?"
 
---- 
+---
 
 **👀 Must read 👀**
 
@@ -44,7 +44,7 @@ This first beta version implements the foundations of our vision.
 With the latest release (June 2025):
 - **A shared centralized ecosystem**: Use Ebiose’s cloud to kickstart a forge cycle with curated agents from our shared ecosystem.
 The top-performing agents are automatically promoted and reintegrated, making the ecosystem stronger with every cycle. 👉 [\[Access the Ebiose cloud now.\]](https://app.ebiose.com/login)
-- **LiteLLM support**: Ebiose now integrates with [LiteLLM](https://www.litellm.ai/) to simplify the 
+- **LiteLLM support**: Ebiose now integrates with [LiteLLM](https://www.litellm.ai/) to simplify the
 management of your own LLMs.
 
 
@@ -110,7 +110,7 @@ To build and run Ebiose using Docker, follow these steps:
     endpoints:
     - endpoint_id: "gpt-4o-mini"
       provider: "OpenAI"
-      api_key: "YOUR_OPENAI_API_KEY" 
+      api_key: "YOUR_OPENAI_API_KEY"
     ```
 
 5. Run the Docker image using the following command, which mounts the `model_endpoints.yml` file and passes environment variables from `.env`:
@@ -125,7 +125,7 @@ To build and run Ebiose using Docker, follow these steps:
 
 #### 📦 Install Project Dependencies
 
-Ebiose uses [uv](https://docs.astral.sh/uv/) as a packaging and dependency manager. See [Astral's uv documentation](https://docs.astral.sh/uv/getting-started/installation/) to install it.  
+Ebiose uses [uv](https://docs.astral.sh/uv/) as a packaging and dependency manager. See [Astral's uv documentation](https://docs.astral.sh/uv/getting-started/installation/) to install it.
 
 Once uv is installed, use it to install your project dependencies. In your project directory, run:
 
@@ -151,7 +151,7 @@ The Jupyter notebook [`quickstart.ipynb`](notebooks/quickstart.ipynb) is the eas
 
 To go further, the `examples/` directory features a complete forge example designed to optimize agents that solve math problems. Check out [`examples/math_forge/math_forge.py`](math_forge/math_forge.py) for the implementation of the `MathLangGraphForge` forge.
 
-For demonstration purposes, the `run.py` script is configured to manage a forge cycle with only two agents per generation, using a tiny budget of $0.02. The cycle should take 1 to 2 minutes to consume the budget using the default model endpoint `gpt-4o-mini`. Each generated agent will be 
+For demonstration purposes, the `run.py` script is configured to manage a forge cycle with only two agents per generation, using a tiny budget of $0.02. The cycle should take 1 to 2 minutes to consume the budget using the default model endpoint `gpt-4o-mini`. Each generated agent will be
 evaluated on 5 math problems from GSM-8k test dataset.
 
 To run a cycle of the Math forge, execute the following command in your project directory:
@@ -185,19 +185,19 @@ Kick off your journey by implementing your own forge with the accompanying `comp
 
 # 🤖 Model APIs support
 
-As of today, Ebiose uses LangChain/LangGraph to implement agents. Using the different providers of LLMs, and ML models, has been made as easy as possible. 
+As of today, Ebiose uses LangChain/LangGraph to implement agents. Using the different providers of LLMs, and ML models, has been made as easy as possible.
 
 Since June 2025, Ebiose has been integrated with LiteLLM and now offers its own cloud — making model management even easier.
 
 ## Ebiose Cloud
 
-The fastest and easiest way to run your forge in just a few steps with 
-$10 free credits. 
+The fastest and easiest way to run your forge in just a few steps with
+$10 free credits.
 
-### 1. Create your account  
+### 1. Create your account
 Sign up at [Ebiose Cloud](https://app.ebiose.com/login).
 
-### 2. Add your API key  
+### 2. Add your API key
 Generate your Ebiose API key and add it to your `model_endpoints.yml` file:
 
 ```yaml
@@ -205,7 +205,7 @@ ebiose:
   api_key: "your-ebiose-api-key"  # Replace with your Ebiose API key
   api_base: "https://cloud.ebiose.com/"
 ```
-### 3. Set your default model  
+### 3. Set your default model
 Specify the model to use by default:
 ```YAML
 default_agent_endpoint_id: "azure/gpt-4o-mini"
@@ -230,7 +230,7 @@ More models to come. Feel free to ask.
 
 ## Using LiteLLM
 
-Ebiose integrates with [LiteLLM](https://www.litellm.ai/), either through the cloud or a self-hosted proxy.  
+Ebiose integrates with [LiteLLM](https://www.litellm.ai/), either through the cloud or a self-hosted proxy.
 Refer to the [LiteLLM documentation](https://docs.litellm.ai/docs/) to get started and generate your LiteLLM API key.
 
 Once you have your key, update the `model_endpoints.yml` file as follows:
@@ -255,13 +255,13 @@ endpoints:
 > 🚨 The "local" mode for running forge cycles has not been fully tested. Use with caution and report any issues. See [Issue #29](https://github.com/ebiose-ai/ebiose/issues/29) for details.
 
 ## Using Your Own Access to LLM Providers
-You may also use your own credentials **without going through LiteLLM**.  
+You may also use your own credentials **without going through LiteLLM**.
 To do so, define the model endpoints you want to use in the `model_endpoints.yml` file located at the root of the project.
 
 Fill in your secret credentials using the examples below.
 
-For other providers not listed here, refer to [LangChain's documentation](https://python.langchain.com/docs/integrations/providers/)  
-and adapt the [`LangGraphLLMApi` class](ebiose/backends/langgraph/llm_api.py) as needed.  
+For other providers not listed here, refer to [LangChain's documentation](https://python.langchain.com/docs/integrations/providers/)
+and adapt the [`LangGraphLLMApi` class](ebiose/backends/langgraph/llm_api.py) as needed.
 Issues and pull requests are welcome!
 
 > 🚨 To run a forge cycle without Ebiose cloud, be sure to set it up using the dedicated [`LocalForgeCycleConfig` class](ebiose/core/forge_cycle.py#L01).
@@ -445,7 +445,7 @@ endpoints:
   - endpoint_id: "gpt-4o-mini"
     provider: "OpenAI"
     api_key: "YOUR_OPENAI_API_KEY" # fill in your OpenAI API key
-    
+
 ```
 
 ### Issue 4: Jupyter Notebook Not Running

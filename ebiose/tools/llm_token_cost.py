@@ -4,23 +4,20 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
-
 import json
 from pathlib import Path
-from typing import ClassVar
-
-from loguru import logger
 
 
 def load_model_prices_and_context_window() -> dict:
     # TODO(xabier): fix the path to the json file
     # Compute the project root relative to this file
     project_root = Path(__file__).parents[2]
-    json_path = project_root / "ebiose" / "tools" / "model_prices_and_context_window.json"
+    json_path = (
+        project_root / "ebiose" / "tools" / "model_prices_and_context_window.json"
+    )
 
     with json_path.open() as f:
         return json.load(f)
-
 
 
 # class LLMTokenCost:

@@ -11,6 +11,7 @@ import uuid
 from typing import Literal
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
+from langgraph.runtime import Runtime
 from pydantic import BaseModel, Field
 
 from ebiose.backends.langgraph.engine.states import (
@@ -21,22 +22,23 @@ from ebiose.core.engines.graph_engine.nodes.pydantic_validator_node import (
     PydanticValidatorNode,
 )
 
-from langgraph.runtime import Runtime
-
 
 class InputState(LangGraphEngineInputState):
     output_model: type[BaseModel] | None = Field(None, exclude=True)
 
+
 class OutputState(LangGraphEngineOutputState):
     condition: Literal["success", "failure"] | None = None
 
-class LangGraphPydanticValidatorNode(PydanticValidatorNode):
 
+class LangGraphPydanticValidatorNode(PydanticValidatorNode):
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
-    def get_messages(self, condition: str, error: Exception | None = None) -> list[AnyMessage]:
-        tool_call_id=f"call_{self.id}_{uuid.uuid4()}"[40]
+    def get_messages(
+        self, condition: str, error: Exception | None = None,
+    ) -> list[AnyMessage]:
+        tool_call_id = f"call_{self.id}_{uuid.uuid4()}"[40]
         tool_call = ToolCall(
             name=self.name,
             args={},
@@ -69,7 +71,9 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
 
         return messages
 
-    async def call_node(self, state: InputState | dict, runtime: Runtime[BaseModel]) -> OutputState:
+    async def call_node(
+        self, state: InputState | dict, runtime: Runtime[BaseModel],
+    ) -> OutputState:
         try:
             tool_messages = []
             for message in reversed(state.messages):
@@ -94,7 +98,7 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
                     output=None,
                     error_message=str(e),
                     condition="failure",
-                    )
+                )
 
             return self.output_state_model(
                 messages=self.get_messages("success"),

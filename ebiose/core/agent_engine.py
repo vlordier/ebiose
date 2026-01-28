@@ -6,18 +6,23 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from abc import abstractmethod
 import traceback
+from abc import abstractmethod
 
 from langfuse import observe
-
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 
 class AgentEngineRunError(Exception):
     """Custom exception for errors during agent run."""
-    def __init__(self, message:str, original_exception: Exception | None=None, agent_identifier:str | None=None) -> None:
+
+    def __init__(
+        self,
+        message: str,
+        original_exception: Exception | None = None,
+        agent_identifier: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.original_exception = original_exception
         self.agent_identifier = agent_identifier
@@ -36,6 +41,7 @@ class AgentEngineRunError(Exception):
             error_msg += f"\n--- Caused by ---\n{''.join(orig_traceback)}"
         return error_msg
 
+
 class AgentEngine(BaseModel):
     engine_type: str
     agent_id: str | None = None
@@ -43,12 +49,20 @@ class AgentEngine(BaseModel):
 
     model_config = ConfigDict(
         alias_generator=to_camel,
-        populate_by_name=True, # Allows initializing with snake_case names
+        populate_by_name=True,  # Allows initializing with snake_case names
     )
 
-    async def run(self, agent_input: BaseModel, master_agent_id: str, forge_cycle_id: str | None = None, **kwargs: dict[str, any]) -> any:
+    async def run(
+        self,
+        agent_input: BaseModel,
+        master_agent_id: str,
+        forge_cycle_id: str | None = None,
+        **kwargs: dict[str, any],
+    ) -> any:
         try:
-            return await self._run_implementation(agent_input, master_agent_id, forge_cycle_id, **kwargs)
+            return await self._run_implementation(
+                agent_input, master_agent_id, forge_cycle_id, **kwargs,
+            )
         except Exception as e:
             raise AgentEngineRunError(
                 message="Error during agent engine run",
@@ -58,5 +72,11 @@ class AgentEngine(BaseModel):
 
     @observe(name="run_agent_engine")
     @abstractmethod
-    async def _run_implementation(self, agent_input: BaseModel, master_agent_id: str, forge_cycle_id: str | None = None, **kwargs: dict[str, any]) -> any:
+    async def _run_implementation(
+        self,
+        agent_input: BaseModel,
+        master_agent_id: str,
+        forge_cycle_id: str | None = None,
+        **kwargs: dict[str, any],
+    ) -> any:
         pass

@@ -67,7 +67,10 @@ class Graph(BaseModel):
 
         # check edges and nodes
         node_ids = {node.id for node in self.nodes}
-        node_ids_in_edges = set([edge.start_node_id for edge in self.edges] + [edge.end_node_id for edge in self.edges])
+        node_ids_in_edges = set(
+            [edge.start_node_id for edge in self.edges]
+            + [edge.end_node_id for edge in self.edges],
+        )
 
         # add a message for nodes that are not in the edges
         for node_id in node_ids - node_ids_in_edges:
@@ -109,16 +112,16 @@ class Graph(BaseModel):
                 if edge.start_node_id == node.id and edge.is_conditional()
             ]
             outgoing_edges = [
-                edge
-                for edge in self.edges
-                if edge.start_node_id == node.id
+                edge for edge in self.edges if edge.start_node_id == node.id
             ]
             if len(conditional_outgoing_edges) == 1 and len(outgoing_edges) == 1:
                 # if node has a unique edge which is conditional, remove condition
                 for edge in self.edges:
                     if edge.start_node_id == node.id:
                         edge.condition = None
-            elif len(conditional_outgoing_edges)>0 and len(conditional_outgoing_edges) != len(outgoing_edges):
+            elif len(conditional_outgoing_edges) > 0 and len(
+                conditional_outgoing_edges,
+            ) != len(outgoing_edges):
                 # if node has several edges but not all are conditional
                 nodes_with_errors.append(node.id)
 
@@ -225,7 +228,6 @@ class Graph(BaseModel):
                     errors.append(error)
 
         return errors, validated_nodes
-
 
     def add_edge(self: Self, edge: Edge) -> None:
         """Add an edge to the graph.

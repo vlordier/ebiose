@@ -1,6 +1,6 @@
 import importlib
-from functools import reduce
 import random
+from functools import reduce
 
 from pydantic import BaseModel
 
@@ -49,6 +49,7 @@ if BaseNode in node_types:
 # Create the NodeTypes union from the node types list
 NodeTypes = reduce(lambda acc, t: acc | t, node_types)
 
+
 def get_node_types_docstrings(node_types_names: list) -> str:
     """Get the docstring of each node type to pass in the prompts."""
     docstrings_list = []
@@ -60,7 +61,10 @@ def get_node_types_docstrings(node_types_names: list) -> str:
                 docstrings_list.append(f"**{node_type_name}**:\n{docstring}\n")
     return "\n".join(docstrings_list)
 
-def get_n_llm_nodes_constraint_string(random_n_llm_nodes: bool, max_llm_nodes: int) -> str:  # noqa: FBT001
+
+def get_n_llm_nodes_constraint_string(
+    random_n_llm_nodes: bool, max_llm_nodes: int,
+) -> str:
     """Get the constraint string for the number of LLM nodes in the graph."""
     if random_n_llm_nodes:
         return f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, max_llm_nodes)} exactly."

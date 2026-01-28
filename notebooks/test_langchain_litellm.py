@@ -51,7 +51,7 @@ if False:
     print(chat_call)
 
 if True:
-        
+
 
     class AgentInput(BaseModel):
         math_problem: str = Field(..., description="The mathematical word problem to solve")
@@ -179,10 +179,10 @@ if False:
     async def call_llm(state: AgentState):
         # Get the latest message
         messages = state['messages']
-        
+
         # Call the LLM
         response = await llm.ainvoke(messages)
-        
+
         # Return the updated state with the new AI message
         return {"messages": [response]}
 
