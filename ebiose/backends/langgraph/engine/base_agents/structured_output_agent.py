@@ -5,6 +5,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+from typing import cast
 
 from langchain_core.messages import AnyMessage
 from pydantic import BaseModel
@@ -28,14 +29,17 @@ def init_structured_output_agent(
     output_model: type[BaseModel],
     model_endpoint_id: str,
 ) -> None:
+    # Type checking: ensure output_model is actually a class
+    if not isinstance(output_model, type):
+        raise TypeError("output_model must be a class")
     from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
     from ebiose.core.agent import Agent
 
     class AgentInput(BaseModel):
         last_message: AnyMessage | None = None
 
-    class AgentOutput(output_model):
-        pass
+    # Create AgentOutput class dynamically to avoid mypy confusion
+    AgentOutput = type("AgentOutput", (output_model,), {})
 
     shared_context_prompt = SHARED_CONTEXT_PROMPT
 

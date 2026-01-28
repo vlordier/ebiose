@@ -273,18 +273,18 @@ class EbioseAPIClient:
         ecosystem_id: str,
         *,
         return_ids_only: bool,
-    ) -> list["Agent"] | None:
+    ) -> list[str] | list["Agent"] | None:
         response = cls._client.list_agents_in_ecosystem(ecosystem_uuid=ecosystem_id)
         if return_ids_only:
-            return [r.uuid for r in response]
+            return [r.uuid for r in response if r.uuid is not None]
 
         agents = []
         for r in response:
             try:
                 agent = AgentFactory.load_agent_from_api(r)
+                agents.append(agent)
             except Exception as e:
                 print(f"Error loading agent from API: {e!s}")
-            agents.append(agent)
         return agents
 
     @classmethod

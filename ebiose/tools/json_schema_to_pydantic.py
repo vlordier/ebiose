@@ -28,7 +28,7 @@ _MODEL_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 _DEFS_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 
 
-def _get_python_type(  # type: ignore[return]
+def _get_python_type(
     schema: dict[str, Any],
     recursion_depth: int = 0,
 ) -> type | ForwardRef:
