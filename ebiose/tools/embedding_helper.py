@@ -4,6 +4,8 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
+from typing import cast
+
 import numpy as np
 
 
@@ -15,7 +17,7 @@ def generate_embeddings(text: str) -> np.ndarray:
 
 
 def embedding_distance(emb_a: np.ndarray, emb_b: np.ndarray) -> float:
-    return 1 - np.dot(emb_a, emb_b) / (np.linalg.norm(emb_a) * np.linalg.norm(emb_b))
+    return cast(float, 1 - np.dot(emb_a, emb_b) / (np.linalg.norm(emb_a) * np.linalg.norm(emb_b)))
 
 
 def generate_fake_embedding(dimension: int = 1536) -> np.ndarray:

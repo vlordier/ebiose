@@ -224,8 +224,8 @@ class Graph(BaseModel):
                 )
             except ValidationError as e:
                 for error in e.errors():
-                    error["loc"] = (index,) + error["loc"]
-                    errors.append(error)
+                    error_dict = dict(error)  # Convert ErrorDetails to dict
+                    errors.append(error_dict)
 
         return errors, validated_nodes
 

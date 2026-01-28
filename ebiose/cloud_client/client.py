@@ -314,10 +314,10 @@ class EbioseCloudClient:
         self,
         method: str,
         endpoint: str,
-        params: dict[str, any] | None = None,
-        data: any = None,
-        json_data: any = None,
-    ) -> any:
+        params: dict[str, Any] | None = None,
+        data: Any = None,
+        json_data: Any = None,
+    ) -> Any:
         """Internal method to make an HTTP request."""
         url = f"{self.base_url}{endpoint}"
         headers = {"Accept": "application/json"}

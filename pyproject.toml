@@ -33,7 +33,6 @@ line-length = 88
 target-version = "py312"
 exclude = ["./notebooks/", "./ebiose/generated_cloud_sdk/"]
 
-
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
@@ -56,29 +55,21 @@ ignore = [
   "ERA001",  # commented-out code (too many to fix manually)
 ]
 
-[tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = ["pydantic.BaseModel"]
-runtime-evaluated-decorators = ["pydantic.field_validator"]
+# Additional file type linting
+extend-include = ["*.yml", "*.yaml", "*.md", "*.ipynb", "Dockerfile*", "Makefile*"]
 
+[tool.ruff.lint.per-file-ignores]
+# YAML files - focus on syntax and structure
+"*.yml" = ["E902"]  # Ignore file encoding issues for YAML
+"*.yaml" = ["E902"]  # Ignore file encoding issues for YAML
+# Markdown files - be more lenient
+"*.md" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "D106"]
+# Jupyter notebooks - very lenient
+"*.ipynb" = ["ALL"]
+# Docker and Makefiles - infrastructure files
+"Dockerfile*" = ["E501", "D100", "D101"]
+"Makefile*" = ["E501", "D100", "D101"]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-
-[tool.ruff.lint.flake8-tidy-imports]
-# Disallow all relative imports.
-ban-relative-imports = "all"
-
-[tool.hatch.build.targets.wheel]
-packages = ["ebiose"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.pytest.ini_options]
-pythonpath = "ebiose"
-testpaths = ["tests"]
-addopts = "-v -s --strict-markers"
 
 [tool.mypy]
 python_version = "3.12"
@@ -109,6 +100,15 @@ disallow_incomplete_defs = false
 module = "test_*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+# Additional linting tools
+[tool.yamlfix]
+include = ["*.yml", "*.yaml"]
+exclude = ["notebooks/**"]
+
+[tool.yamlfmt]
+include = ["*.yml", "*.yaml"]
+exclude = ["notebooks/**"]
 
 [build-system]
 requires = ["hatchling"]

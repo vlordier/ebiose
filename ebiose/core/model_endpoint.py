@@ -104,15 +104,17 @@ class ModelEndpoints:
 
     @staticmethod
     def use_lite_llm() -> bool:
-        return ModelEndpoints._lite_llm["use"]
+        return bool(ModelEndpoints._lite_llm["use"])
 
     @staticmethod
     def use_lite_llm_proxy() -> bool:
-        return ModelEndpoints._lite_llm["use_proxy"]
+        return bool(ModelEndpoints._lite_llm["use_proxy"])
 
     @staticmethod
     def get_lite_llm_config() -> tuple[str, str]:
-        return ModelEndpoints._lite_llm["api_key"], ModelEndpoints._lite_llm["api_base"]
+        api_key = ModelEndpoints._lite_llm["api_key"]
+        api_base = ModelEndpoints._lite_llm["api_base"]
+        return str(api_key) if api_key is not None else "", str(api_base) if api_base is not None else ""
 
     @staticmethod
     def load_model_endpoints(file_path: str | None = None) -> list[ModelEndpoint]:
