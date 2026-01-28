@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from loguru import logger as _logger
+
+if TYPE_CHECKING:
+    from loguru import Message
 from pydantic import BaseModel, Field, computed_field
 
 from ebiose.cloud_client.ebiose_api_client import EbioseAPIClient
@@ -45,7 +48,7 @@ class SelectionMethod(Enum):
 event_logger = _logger
 
 
-def elastic_sink(message) -> None:  # noqa: ANN001
+def elastic_sink(message: "Message") -> None:
     record = message.record
     record_extra = record.pop("extra", {})
     event_payload = record_extra.pop("event_payload", None)

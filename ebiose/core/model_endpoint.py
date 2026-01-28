@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import yaml
 from pydantic import BaseModel, SecretStr
@@ -57,13 +57,14 @@ class ModelEndpoints:
     _default_meta_agent_endpoint_id: str | None = None
     _default_utility_agent_endpoint_id: str | None = None
     _ebiose_api_config: EbioseAPIConfig | None = None
-    _lite_llm: ClassVar[dict[str, str]] = {"use": False, "use_proxy": False}
+    _lite_llm: ClassVar[dict[str, Any]] = {"use": False, "use_proxy": False}
     _endpoints: ClassVar[list[ModelEndpoint]] = []
 
     @staticmethod
     def get_default_model_endpoint_id() -> str:
         if ModelEndpoints._default_agent_endpoint_id is None:
             ModelEndpoints.load_model_endpoints()
+        assert ModelEndpoints._default_agent_endpoint_id is not None
         return ModelEndpoints._default_agent_endpoint_id
 
     @staticmethod
@@ -86,7 +87,10 @@ class ModelEndpoints:
     def get_ebiose_api_key() -> str | None:
         if ModelEndpoints._ebiose_api_config is None:
             ModelEndpoints.load_model_endpoints()
-        if ModelEndpoints._ebiose_api_config is not None:
+        if (
+            ModelEndpoints._ebiose_api_config is not None
+            and ModelEndpoints._ebiose_api_config.api_key is not None
+        ):
             return ModelEndpoints._ebiose_api_config.api_key.get_secret_value()
         return None
 

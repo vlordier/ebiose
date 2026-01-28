@@ -13,7 +13,7 @@ from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
 from ebiose.core.llm_api import LLMApi
 
 
-def test_cloud_mode_with_provided_base_url():
+def test_cloud_mode_with_provided_base_url() -> None:
     """Test that cloud mode uses the provided lite_llm_api_base when provided by cloud API."""
     print("Testing cloud mode with base URL provided by cloud API...")
 
@@ -46,7 +46,7 @@ def test_cloud_mode_with_provided_base_url():
     print("✓ Cloud mode with provided base URL works correctly")
 
 
-def test_cloud_mode_without_base_url():
+def test_cloud_mode_without_base_url() -> None:
     """Test that cloud mode without base URL sets it to None."""
     print("Testing cloud mode without provided base URL...")
 
@@ -71,7 +71,7 @@ def test_cloud_mode_without_base_url():
     print("✓ Cloud mode without base URL works correctly")
 
 
-def test_local_mode():
+def test_local_mode() -> None:
     """Test that local mode handles configuration correctly."""
     print("Testing local mode...")
 
@@ -94,7 +94,7 @@ def test_local_mode():
     print("✓ Local mode works correctly")
 
 
-def test_no_hardcoded_urls():
+def test_no_hardcoded_urls() -> None:
     """Test that the old hardcoded URL is not being used."""
     print("Testing that hardcoded URLs are not used...")
 
@@ -131,7 +131,7 @@ def test_no_hardcoded_urls():
     print("✓ No hardcoded URLs found")
 
 
-def main():
+def main() -> None:
     """Run all tests."""
     print("Testing LLMApi initialization fixes...")
     print("=" * 50)

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def test_initialization_logic():
+def test_initialization_logic() -> bool:
     """Test the initialization logic by examining the source code."""
     # Read the LLMApi source
     llm_api_path = Path(__file__).parent.parent / "ebiose" / "core" / "llm_api.py"
@@ -72,7 +72,7 @@ def test_initialization_logic():
     return True
 
 
-def main():
+def main() -> None:
     """Run the test."""
     print("Testing LLMApi initialization fixes...")
     print("=" * 50)

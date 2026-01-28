@@ -3,7 +3,7 @@ import json
 import random
 import re
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from loguru import logger
 
@@ -104,13 +104,13 @@ class EbioseAPIClient:
         return data
 
     # This is the updated decorator within YourClass
-    def _handle_api_errors(func):
+    def _handle_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to handle client initialization, API errors, AND
         to convert response keys from PascalCase to snake_case.
         """
 
         @functools.wraps(func)
-        def wrapper(cls, *args, **kwargs):
+        def wrapper(cls: type["EbioseAPIClient"], *args: Any, **kwargs: Any) -> Any:
             try:
                 if cls._client is None:
                     cls.set_client()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from enum import Enum
+from typing import Any, Callable
 
 import requests
 from loguru import logger
@@ -15,15 +16,15 @@ class EbioseCloudError(Exception):
 
     def __init__(
         self,
-        message,
+        message: str,
         status_code: int | None = None,
         response_text: str | None = None,
-    ):
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.response_text = response_text
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{super().__str__()} (Status Code: {self.status_code}, Response: {self.response_text or 'N/A'})"
 
 
@@ -702,7 +703,13 @@ class EbioseAPIClient:
         return cls._client
 
     @classmethod
-    def _handle_request(cls, action_description: str, api_call, *args, **kwargs):
+    def _handle_request(
+        cls,
+        action_description: str,
+        api_call: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         """Generic request handler for the facade."""
         try:
             # logger.debug(f"\nAttempting to {action_description}...")
