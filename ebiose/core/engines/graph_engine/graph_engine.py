@@ -73,7 +73,7 @@ class GraphEngine(AgentEngine):
         self,
         io_model: type[BaseModel],
     ) -> dict[str, Any]:
-        io_model_dict = {"name": io_model.__name__, "fields": {}}
+        io_model_dict: dict[str, Any] = {"name": io_model.__name__, "fields": {}}
         for field_name, field in io_model.model_fields.items():
             annotation_name = "Any"
             if field.annotation:

@@ -293,13 +293,13 @@ class LangGraphLLMApi(LLMApi):
                 0,
             )
 
-            cost = cost_per_token(
+            cost_tuple = cost_per_token(
                 model=model_endpoint_id,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
             )
 
-            cost = sum(cost)
+            cost = sum(cost_tuple)
             cls.add_agent_cost(agent_id, cost)
 
         except Exception as e:

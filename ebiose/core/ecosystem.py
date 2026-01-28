@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, ClassVar
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
-from sortedcontainers import SortedList
+from sortedcontainers import SortedList  # type: ignore[import-untyped]
 
 from ebiose.core.engines.graph_engine.utils import GraphUtils
 from ebiose.core.model_endpoint import ModelEndpoints
