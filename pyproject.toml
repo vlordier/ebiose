@@ -52,6 +52,7 @@ ignore = [
   "BLE001",  # Do not catch blind exception: `Exception`
   "PLR0913", # Too many arguments in function definition (6 > 5)
   "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+  "ERA001",  # commented-out code (too many to fix manually)
 ]
 
 [tool.ruff.lint.flake8-type-checking]

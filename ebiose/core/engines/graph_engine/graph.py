@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from typing import Literal, LiteralString, Self
+from typing import Any, Literal, LiteralString, Self
 
 from pydantic import (
     BaseModel,
@@ -58,7 +58,7 @@ class Graph(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @model_validator(mode="after")
-    def validate_graph(self, info: ValidationInfo) -> Graph:  # noqa: ARG002
+    def validate_graph(self, _info: ValidationInfo) -> Graph:
         """Validate the graph by checking placeholders and outgoing conditional edges."""
         msg = ""
 
@@ -133,7 +133,7 @@ class Graph(BaseModel):
 
     @field_validator("nodes", mode="before")
     @classmethod
-    def validate_nodes(cls, nodes: any) -> list[NodeTypes]:
+    def validate_nodes(cls, nodes: Any) -> list[NodeTypes]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
         if not isinstance(nodes, list):
             msg = "Field 'nodes' should be a list"
@@ -154,7 +154,7 @@ class Graph(BaseModel):
 
     @field_validator("edges", mode="before")
     @classmethod
-    def validate_edges(cls, edges: any) -> list[Edge]:
+    def validate_edges(cls, edges: Any) -> list[Edge]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
         if not isinstance(edges, list):
             msg = "Field 'edges' should be a list"
