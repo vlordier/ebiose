@@ -52,7 +52,16 @@ class LangGraphToolNode(BaseNode):
     ) -> OutputState:
         try:
             outputs = []
-            for tool_call in state["messages"][-1].tool_calls:
+            # Handle both dict and structured state
+            messages = (
+                state.get("messages", state.messages)
+                if isinstance(state, dict)
+                else state.messages
+            )
+            last_message = messages[-1] if messages else None
+            tool_calls = last_message.tool_calls if last_message else []
+
+            for tool_call in tool_calls:
                 tool_result = self.tools_by_name[tool_call["name"]].invoke(
                     tool_call["args"],
                 )

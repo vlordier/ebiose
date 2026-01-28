@@ -46,8 +46,13 @@ node_types_map = {node_type.__name__: node_type for node_type in node_types}
 if BaseNode in node_types:
     node_types.remove(BaseNode)
 
+
 # Create the NodeTypes union from the node types list
-NodeTypes = reduce(lambda acc, t: acc | t, node_types)
+def _union_types(acc, t):
+    return acc | t
+
+
+NodeTypes = reduce(_union_types, node_types)
 
 
 def get_node_types_docstrings(node_types_names: list) -> str:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence  # noqa: TC003
-from typing import Literal, cast
+from typing import Literal, cast, Dict, Any, Optional
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
 from langgraph.runtime import Runtime
@@ -132,11 +132,32 @@ class LangGraphRoutingNode(RoutingNode):
                 output_condition = condition
 
         if count == 1:
-            return self.output_state_model(
-                messages=self.get_messages(condition="found"),
-                condition="found",
-                output_condition=output_condition,
+            return cast(
+                Dict[str, Any],
+                self.output_state_model(
+                    messages=self.get_messages(condition="found")
+                    if hasattr(self, "output_state_model")
+                    else [],
+                    condition="found",
+                    output_condition=output_condition,
+                ),
             )
+        error_message = (
+            "The message does not contain any of the possible conditions."
+            if count == 0
+            else "The message contains more than one of the possible conditions."
+        )
+        return cast(
+            Dict[str, Any],
+            self.output_state_model(
+                messages=self.get_messages()
+                if hasattr(self, "output_state_model")
+                else [],
+                error_message=error_message,
+                condition="not_found",
+                output_condition=output_condition,
+            ),
+        )
         error_message = (
             "The message does not contain any of the possible conditions."
             if count == 0
