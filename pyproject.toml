@@ -98,6 +98,16 @@ exclude = [
     "ebiose/generated_cloud_sdk/",
 ]
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = "test_*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

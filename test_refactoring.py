@@ -5,7 +5,8 @@ from ebiose.core.llm_api import LLMApi
 from ebiose.core.llm_api_factory import LLMApiFactory
 
 
-def test_refactoring() -> None:
+def test_refactoring():
+    """Test that the refactoring works correctly."""
     """Test that the refactoring works correctly."""
     # Test 1: Factory should use LangGraphLLMApi by default
     api = LLMApiFactory.get_api()

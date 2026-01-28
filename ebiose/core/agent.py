@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from langfuse import observe
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
@@ -48,7 +48,7 @@ class Agent(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_agent(cls, data: any) -> any:
+    def validate_agent(cls, data: dict[str, Any]) -> dict[str, Any]:
         if "agent_engine" in data and data["agent_engine"] is not None:
             data["agent_engine"] = cls.validate_agent_engine(data["agent_engine"])
         return data

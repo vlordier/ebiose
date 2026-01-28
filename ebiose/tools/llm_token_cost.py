@@ -6,9 +6,10 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 import json
 from pathlib import Path
+from typing import Any
 
 
-def load_model_prices_and_context_window() -> dict:
+def load_model_prices_and_context_window() -> dict[str, Any]:
     # TODO(xabier): fix the path to the json file
     # Compute the project root relative to this file
     project_root = Path(__file__).parents[2]
