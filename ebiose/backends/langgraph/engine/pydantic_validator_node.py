@@ -47,7 +47,7 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
             id=tool_call_id,
         )
 
-        messages = [
+        messages: list[AnyMessage] = [
             AIMessage(
                 content="",
                 tool_calls=[tool_call],
