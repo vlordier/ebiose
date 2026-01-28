@@ -124,3 +124,10 @@ ignored-codes = ["DL3008", "DL3013", "DL3018"]  # Common acceptable warnings
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
+    "types-tqdm>=4.67.0.20250809",
+]
