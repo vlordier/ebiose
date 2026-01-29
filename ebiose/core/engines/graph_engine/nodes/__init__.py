@@ -52,7 +52,7 @@ def _union_types(acc, t):
     return acc | t
 
 
-NodeTypes = reduce(_union_types, node_types)
+NodeTypes = reduce(_union_types, node_types)  # type: ignore[assignment]
 
 
 def get_node_types_docstrings(node_types_names: list) -> str:

@@ -47,7 +47,7 @@ class Graph(BaseModel):
         default_factory=list,
         description="list of edges in the graph",
     )
-    nodes: list[NodeTypes] = Field(
+    nodes: list[BaseNode] = Field(
         default_factory=list,
         description="list of nodes in the graph",
     )

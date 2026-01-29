@@ -131,7 +131,9 @@ class AgentFactory:
             )
         except Exception as e:
             logger.debug(f"Architect agent failed creating a valid agent: {e!s}")
-            return None
+            raise RuntimeError(
+                f"Failed to create agent from architect output: {e}"
+            ) from e
 
         try:
             new_agent = Agent(
@@ -139,12 +141,14 @@ class AgentFactory:
                 description=agent_description,
                 id=agent_id,
                 architect_agent_id=architect_agent.id,
-                genetic_operator_agent_id=genetic_operator_agent.id,
+                genetic_operator_agent_id=genetic_operator_agent.id
+                if genetic_operator_agent
+                else None,
                 agent_engine=generated_agent_engine,
             )
         except Exception as e:
             logger.debug(f"Architect agent failed creating a valid agent: {e!s}")
-            new_agent = None
+            raise RuntimeError(f"Failed to generate agent: {e}") from e
 
         return new_agent
 

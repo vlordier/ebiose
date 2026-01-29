@@ -61,13 +61,19 @@ class EbioseAPIClient:
     _client: EbioseCloudClient | None = None
 
     @classmethod
-    def set_client(cls) -> None:
-        """Set the API client with the provided API key."""
+    def _get_client(cls) -> EbioseCloudClient:
+        """Get the API client, initializing it if necessary."""
         if cls._client is None:
             cls._client = EbioseCloudClient(
                 base_url=ModelEndpoints.get_ebiose_api_base(),
                 api_key=ModelEndpoints.get_ebiose_api_key(),
             )
+        return cls._client
+
+    @classmethod
+    def set_client(cls) -> None:
+        """Set the API client with the provided API key."""
+        cls._get_client()  # Initialize the client
 
     import re
 
@@ -143,7 +149,7 @@ class EbioseAPIClient:
     @_handle_api_errors
     def get_user_id(cls) -> str | None:
         """Get the user ID from the API."""
-        response = cls._client.user_info()
+        response = cls._get_client().user_info()
         return response.uuid
 
     @classmethod
@@ -155,13 +161,13 @@ class EbioseAPIClient:
             index=ES_INDEX,
             data=json_message,
         )
-        cls._client.add_log_entry(data=log_entry)
+        cls._get_client().add_log_entry(data=log_entry)
 
     @classmethod
     @_handle_api_errors
     def get_ecosystems(cls) -> list | None:
         """Get all ecosystem UUIDs."""
-        list_of_ecosystems = cls._client.list_ecosystems()
+        list_of_ecosystems = cls._get_client().list_ecosystems()
 
         if list_of_ecosystems:
             return list_of_ecosystems
@@ -186,7 +192,7 @@ class EbioseAPIClient:
         logger.debug(
             f"Deleting agents with IDs: {agent_ids} from ecosystem {ecosystem_id}",
         )
-        cls._client.delete_agents_from_ecosystem(
+        cls._get_client().delete_agents_from_ecosystem(
             ecosystem_uuid=ecosystem_id,
             agent_uuids=agent_ids,
         )
@@ -202,7 +208,7 @@ class EbioseAPIClient:
         agents_data = [
             build_agent_input_model(agent, forge_cycle_id=None) for agent in agents
         ]
-        response = cls._client.add_agents_to_ecosystem(
+        response = cls._get_client().add_agents_to_ecosystem(
             ecosystem_uuid=ecosystem_id,
             agents_data=agents_data,
         )
@@ -222,7 +228,7 @@ class EbioseAPIClient:
             build_agent_input_model(agent, forge_cycle_id=forge_cycle_id)
             for agent in agents
         ]
-        return cls._client.add_agents_during_forge_cycle(
+        return cls._get_client().add_agents_during_forge_cycle(
             forge_cycle_uuid=forge_cycle_id,
             agents_data=agents_data,
         )
@@ -236,7 +242,7 @@ class EbioseAPIClient:
     ) -> None:
         """Post a single agent in a forge cycle."""
         agent_data = build_agent_input_model(agent, forge_cycle_id=forge_cycle_id)
-        agent_output_model = cls._client.add_agent_during_forge_cycle(
+        agent_output_model = cls._get_client().add_agent_during_forge_cycle(
             forge_cycle_uuid=forge_cycle_id,
             data=agent_data,
         )
@@ -250,7 +256,7 @@ class EbioseAPIClient:
         # TODO(xabier): we don't need the ecosystem to be loaded from the API,
         # we just need to get architect and genetic operator agents from the API
         # based on the selected agents from the ecosystem.
-        response = cls._client.get_ecosystem(uuid=ecosystem_id)
+        response = cls._get_client().get_ecosystem(uuid=ecosystem_id)
         if response:
             agents = [
                 AgentFactory.load_agent_from_api(agent_data)
@@ -274,7 +280,7 @@ class EbioseAPIClient:
         *,
         return_ids_only: bool,
     ) -> list[str] | list["Agent"] | None:
-        response = cls._client.list_agents_in_ecosystem(ecosystem_uuid=ecosystem_id)
+        response = cls._get_client().list_agents_in_ecosystem(ecosystem_uuid=ecosystem_id)
         if return_ids_only:
             return [r.uuid for r in response if r.uuid is not None]
 
@@ -300,7 +306,7 @@ class EbioseAPIClient:
             description=description,
             ecosystemUuid=ecosystem_id,
         )
-        response = cls._client.add_forge(
+        response = cls._get_client().add_forge(
             data=forge_input_model,
         )
         return response.uuid
@@ -331,7 +337,7 @@ class EbioseAPIClient:
             budget=forge_cycle_config.budget,
         )
 
-        new_cycle_output = cls._client.start_new_forge_cycle(
+        new_cycle_output = cls._get_client().start_new_forge_cycle(
             forge_uuid=forge_id,
             data=forge_cycle_input,
             override_key=override_key,
@@ -348,7 +354,7 @@ class EbioseAPIClient:
     @_handle_api_errors
     def select_agents(cls, nb_agents: int, forge_cycle_uuid: str) -> list["Agent"]:
         """Select agents from an ecosystem."""
-        response = cls._client.select_agents_for_forge_cycle(
+        response = cls._get_client().select_agents_for_forge_cycle(
             forge_cycle_uuid=forge_cycle_uuid,
             nb_agents=100,  # nb_agents, # TODO(xabier): fix when server side is ready (then should at least filter on agent_type==None)
         )
@@ -368,7 +374,7 @@ class EbioseAPIClient:
     @classmethod
     @_handle_api_errors
     def get_cost(cls, forge_cycle_uuid: str) -> float:
-        forge_cycle_spend_output = cls._client.get_spend(
+        forge_cycle_spend_output = cls._get_client().get_spend(
             forge_cycle_uuid=forge_cycle_uuid,
         )
         if forge_cycle_spend_output is None:
@@ -388,7 +394,7 @@ class EbioseAPIClient:
             build_agent_input_model(agent, forge_cycle_id=forge_cycle_uuid)
             for agent in winning_agents
         ]
-        cls._client.end_forge_cycle(
+        cls._get_client().end_forge_cycle(
             forge_cycle_uuid=forge_cycle_uuid,
             agents_data=agents_data,
         )
