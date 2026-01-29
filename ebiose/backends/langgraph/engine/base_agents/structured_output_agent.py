@@ -5,10 +5,13 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from langchain_core.messages import AnyMessage
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ebiose.core.agent import Agent
 
 from ebiose.backends.langgraph.engine.pydantic_validator_node import (
     LangGraphPydanticValidatorNode,
@@ -28,7 +31,7 @@ The message is:
 def init_structured_output_agent(
     output_model: type[BaseModel],
     model_endpoint_id: str,
-) -> None:
+) -> "Agent":
     # Type checking: ensure output_model is actually a class
     if not isinstance(output_model, type):
         raise TypeError("output_model must be a class")

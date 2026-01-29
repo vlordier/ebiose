@@ -29,14 +29,27 @@ class AgentFactory:
         from ebiose.core.agent import Agent  # Local import
         from ebiose.core.agent_engine_factory import AgentEngineFactory  # Local import
 
-        agent_id = agent_config.get("id")
+        agent_id = agent_config.get("id") or "unknown"
+
+        # Validate agent_engine config structure
+        agent_engine_config = agent_config.get("agent_engine", {})
+        if not isinstance(agent_engine_config, dict):
+            raise ValueError("agent_engine config must be a dict")
+
+        engine_type = agent_engine_config.get("engine_type")
+        if engine_type is None:
+            raise ValueError("engine_type is required in agent_engine config")
+
+        config_str = agent_engine_config.get("configuration")
+        if config_str is None:
+            raise ValueError("configuration is required in agent_engine config")
 
         # creating engine
-        configuration = json.loads(agent_config["agent_engine"]["configuration"])
+        configuration = json.loads(config_str)
         agent_engine = AgentEngineFactory.create_engine(
-            engine_type=agent_config["agent_engine"]["engine_type"],
+            engine_type=engine_type,
             configuration=configuration,
-            agent_id=agent_id,  # agent_config["agent_engine"]["agent_id"],
+            agent_id=agent_id,
             model_endpoint_id=model_endpoint_id,
         )
 

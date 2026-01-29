@@ -5,9 +5,13 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 from langchain_core.messages import AnyMessage
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ebiose.core.agent import Agent
 
 from ebiose.backends.langgraph.engine.routing_node import (
     LangGraphRoutingNode,
@@ -33,7 +37,7 @@ class AgentOutput(BaseModel):
     output_condition: str | None = None
 
 
-def init_routing_agent(model_endpoint_id: str) -> None:
+def init_routing_agent(model_endpoint_id: str) -> "Agent":
     from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
     from ebiose.core.agent import Agent
 

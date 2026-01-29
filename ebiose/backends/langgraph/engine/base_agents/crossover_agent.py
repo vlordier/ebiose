@@ -4,7 +4,13 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ebiose.core.agent import Agent
 
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
@@ -75,7 +81,7 @@ Create the offspring graph now and return it into the same format as its parents
 """
 
 
-def init_crossover_agent(model_endpoint_id: str | None) -> None:
+def init_crossover_agent(model_endpoint_id: str | None) -> "Agent":
     from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
     from ebiose.core.agent import Agent
 
