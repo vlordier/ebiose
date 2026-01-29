@@ -142,7 +142,7 @@ def init_architect_agent(
         name="Graph Outline Generation",
         purpose="Step 1: Generate the outline of the graph",
         prompt=GRAPH_OUTLINE_GENERATION_PROMPT,
-        temperature=0.7,
+        temperature=0.7,  # type: ignore[call-arg]
     )
 
     prompt_generation_prompt = PROMPT_GENERATION_PROMPT
@@ -156,7 +156,7 @@ def init_architect_agent(
         name="Prompt Generation",
         purpose="Step 2: Generate the prompts for each LLM node",
         prompt=prompt_generation_prompt,
-        temperature=0.7,
+        temperature=0.7,  # type: ignore[call-arg]
     )
 
     if add_format_node:
@@ -165,8 +165,8 @@ def init_architect_agent(
             name="Format",
             purpose="Step 3: Format the entire graph with the prompts",
             prompt=FORMAT_PROMPT,
-            temperature=0,
-            tools=[AgentOutput],
+            temperature=0.0,  # type: ignore[call-arg]
+            tools=[AgentOutput],  # type: ignore[call-arg]
         )
 
     start_node = StartNode()

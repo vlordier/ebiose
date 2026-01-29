@@ -86,7 +86,7 @@ def init_mutation_agent(model_endpoint_id: str | None) -> None:
         name="Mutation",
         purpose="Mutate an existing agent",
         prompt=MUTATION_PROMPT,
-        temperature=0.7,
+        temperature=0.7,  # type: ignore[call-arg]
     )
 
     start_node = StartNode()

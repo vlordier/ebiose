@@ -44,7 +44,7 @@ def init_routing_agent(model_endpoint_id: str) -> None:
         name="llm_router",
         purpose="This node is a router to select the next node to route to.",
         prompt="Append the selected condition to the end of your response.",
-        temperature=0.0,
+        temperature=0.0,  # type: ignore[call-arg]
     )
 
     routing_node = LangGraphRoutingNode(id="routing_node", name="routing_node")

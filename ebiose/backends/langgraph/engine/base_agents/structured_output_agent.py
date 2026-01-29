@@ -48,8 +48,8 @@ def init_structured_output_agent(
         name="llm_with_structured_output",
         purpose="This node uses an LLM to format an input into a given structured output",
         prompt="Format the input into a structured output following the schema given as a tool.",
-        tools=[output_model],
-        temperature=0.0,
+        tools=[output_model],  # type: ignore[call-arg]
+        temperature=0.0,  # type: ignore[call-arg]
     )
 
     pydantic_validator_node = LangGraphPydanticValidatorNode(
