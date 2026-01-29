@@ -132,8 +132,8 @@ class ForgeCycle:
             self._save_agents(agents_folder)
 
             # save fitness
-            fitness_file = Path(full_save_path) / "fitness.json"
-            with Path.open(fitness_file, "w") as fitness_file:
+            fitness_file_path = Path(full_save_path) / "fitness.json"
+            with Path.open(fitness_file_path, "w") as fitness_file:
                 fitness_file.write(json.dumps(self.agents_fitness, indent=4))
 
     def _save_agents(self, agents_folder: str) -> None:
@@ -832,7 +832,13 @@ class ForgeCycle:
 
             # Select mutation agent: embedded or random
             mut_agent_id = parent.genetic_operator_agent_id
-            mut_agent = self.genetic_operator_agents[mut_agent_id]
+            if mut_agent_id is None:
+                mut_agents = self.get_agents_by_type("mutation")
+                mut_agent = (
+                    random.choice(list(mut_agents.values())) if mut_agents else None
+                )
+            else:
+                mut_agent = self.genetic_operator_agents[mut_agent_id]
             if self.check_agent_type(mut_agent) != "mutation":
                 # If the agent is not a mutation agent, we fallback to a random mutation agent
                 mut_agents = self.get_agents_by_type("mutation")

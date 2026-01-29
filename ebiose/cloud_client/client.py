@@ -790,18 +790,21 @@ class EbioseAPIClient:
         )
 
     @classmethod
-    def begin_new_forge_cycle(
+    def start_new_forge_cycle(
         cls,
         forge_uuid: str,
         data: ForgeCycleInputModel,
         override_key: bool | None = None,
     ) -> NewCycleOutputModel:
-        return cls._handle_request(
-            f"start new forge cycle for forge {forge_uuid}",
-            cls._get_client().start_new_forge_cycle,
-            forge_uuid=forge_uuid,
-            data=data,
-            override_key=override_key,
+        return cast(
+            NewCycleOutputModel,
+            cls._handle_request(
+                f"start new forge cycle for forge {forge_uuid}",
+                cls._get_client().start_new_forge_cycle,
+                forge_uuid=forge_uuid,
+                data=data,
+                override_key=override_key,
+            ),
         )
 
     @classmethod
@@ -810,7 +813,7 @@ class EbioseAPIClient:
         forge_cycle_uuid: str,
         agents_data: list[AgentInputModel],
     ) -> None:
-        return cls._handle_request(
+        cls._handle_request(
             f"end forge cycle {forge_cycle_uuid}",
             cls._get_client().end_forge_cycle,
             forge_cycle_uuid=forge_cycle_uuid,
@@ -819,10 +822,13 @@ class EbioseAPIClient:
 
     @classmethod
     def get_forge_cycle_spend(cls, forge_cycle_uuid: str) -> ForgeCycleSpendOutputModel:
-        return cls._handle_request(
-            f"get spend for forge cycle {forge_cycle_uuid}",
-            cls._get_client().get_spend,
-            forge_cycle_uuid=forge_cycle_uuid,
+        return cast(
+            ForgeCycleSpendOutputModel,
+            cls._handle_request(
+                f"get spend for forge cycle {forge_cycle_uuid}",
+                cls._get_client().get_spend,
+                forge_cycle_uuid=forge_cycle_uuid,
+            ),
         )
 
     @classmethod
