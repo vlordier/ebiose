@@ -62,25 +62,67 @@ class AgentFactory:
         return Agent.model_validate(agent_config)
 
     @staticmethod
-    def load_agent_from_api(
+    def create_agent_from_api(
         response_dict: AgentOutputModel,
         model_endpoint_id: str | None = None,
     ) -> Agent:
         from ebiose.core.agent import Agent  # Local import
         from ebiose.core.agent_engine_factory import AgentEngineFactory  # Local import
 
+        # Validate required fields
         if response_dict.agentEngine is None:
             raise ValueError("Agent engine configuration is missing")
 
-        engine_configuration = json.loads(response_dict.agentEngine.configuration)
-        agent_id = response_dict.uuid or ""
-        # creating engine
-        agent_engine = AgentEngineFactory.create_engine(
-            engine_type=response_dict.agentEngine.engineType,
-            configuration=engine_configuration,
-            model_endpoint_id=model_endpoint_id,
-            agent_id=agent_id,  # this ensures that there is not mismatch between the agent id and the engine agent id
+        if not response_dict.agentEngine.configuration:
+            raise ValueError("Agent engine configuration string is empty")
+
+        if not response_dict.agentEngine.engineType:
+            raise ValueError("Agent engine type is missing")
+
+        # Safe parsing with error handling
+        try:
+            engine_configuration = json.loads(response_dict.agentEngine.configuration)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in agent engine configuration: {e}") from e
+
+        agent_id = (
+            response_dict.uuid or f"agent-{hash(response_dict.name or 'unknown')}"
         )
+
+        # Create engine with validated parameters
+        try:
+            agent_engine = AgentEngineFactory.create_engine(
+                engine_type=response_dict.agentEngine.engineType,
+                configuration=engine_configuration,
+                model_endpoint_id=model_endpoint_id,
+                agent_id=agent_id,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to create agent engine: {e}") from e
+
+        # Determine agent type from name (safe string operations)
+        agent_type: Literal["architect", "genetic_operator"] | None = None
+        agent_name = response_dict.name or ""
+
+        if "architect" in agent_name:
+            agent_type = "architect"
+        elif "crossover" in agent_name or "mutation" in agent_name:
+            agent_type = "genetic_operator"
+
+        # Create agent with validated data
+        try:
+            return Agent(
+                id=agent_id,
+                name=response_dict.name or f"agent-{agent_id}",
+                agent_type=agent_type,
+                description=response_dict.description,
+                architect_agent_id=response_dict.architectAgentUuid,
+                genetic_operator_agent_id=response_dict.geneticOperatorAgentUuid,
+                agent_engine=agent_engine,
+                parent_ids=response_dict.parentAgentUuids or [],
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to create agent: {e}") from e
 
         # TODO(xabier): remove when agent_type is implemented server-side
         agent_type = None
