@@ -59,7 +59,7 @@ class LangGraphToolNode(BaseNode):
                 else state.messages
             )
             last_message = messages[-1] if messages else None
-            tool_calls = last_message.tool_calls if last_message else []
+            tool_calls = getattr(last_message, "tool_calls", []) if last_message else []
 
             for tool_call in tool_calls:
                 tool_result = self.tools_by_name[tool_call["name"]].invoke(

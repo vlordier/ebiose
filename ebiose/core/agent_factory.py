@@ -56,8 +56,11 @@ class AgentFactory:
         from ebiose.core.agent import Agent  # Local import
         from ebiose.core.agent_engine_factory import AgentEngineFactory  # Local import
 
+        if response_dict.agentEngine is None:
+            raise ValueError("Agent engine configuration is missing")
+
         engine_configuration = json.loads(response_dict.agentEngine.configuration)
-        agent_id = response_dict.uuid
+        agent_id = response_dict.uuid or ""
         # creating engine
         agent_engine = AgentEngineFactory.create_engine(
             engine_type=response_dict.agentEngine.engineType,

@@ -79,8 +79,13 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
         runtime: Runtime[BaseModel],
     ) -> OutputState:
         try:
+            # Handle union type: state can be InputState or dict
+            messages = (
+                state.get("messages", []) if isinstance(state, dict) else state.messages
+            )
+
             tool_messages = []
-            for message in reversed(state.messages):
+            for message in reversed(messages):
                 if isinstance(message, ToolMessage):
                     tool_messages.append(message)
                 else:

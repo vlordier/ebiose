@@ -179,6 +179,10 @@ class LangGraphEngine(GraphEngine):
         Returns: the final updated graph state
         """
         compiled_graph = await self._compile_graph(forge_cycle_id=forge_cycle_id)
+
+        if self._state is None:
+            raise RuntimeError("State not initialized")
+
         initial_state = self._state(
             input=agent_input,
             **agent_input.model_dump(),
