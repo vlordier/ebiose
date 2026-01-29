@@ -184,6 +184,9 @@ class LangGraphEngine(GraphEngine):
             **agent_input.model_dump(),
         )
 
+        if self.graph is None:
+            raise RuntimeError("Graph not initialized")
+
         node_config = {}
         for node in self.graph.nodes:
             outgoing_conditional_edges = self.graph.get_outgoing_edges(
@@ -217,6 +220,8 @@ class LangGraphEngine(GraphEngine):
             **node_config,
         )
 
+        if compiled_graph is None:
+            raise RuntimeError("Failed to compile graph")
         return await compiled_graph.ainvoke(
             initial_state,
             config=config,

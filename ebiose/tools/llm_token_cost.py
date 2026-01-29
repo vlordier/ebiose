@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def load_model_prices_and_context_window() -> dict[str, Any]:
@@ -18,7 +18,7 @@ def load_model_prices_and_context_window() -> dict[str, Any]:
     )
 
     with json_path.open() as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 # class LLMTokenCost:

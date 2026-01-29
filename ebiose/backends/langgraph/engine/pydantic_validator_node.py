@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ast
 import uuid
-from typing import Literal
+from typing import Literal, cast, Dict, Any
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
 from langgraph.runtime import Runtime
@@ -88,7 +88,8 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
 
             output_model = runtime.context.output_model
             tool_contents = [
-                ast.literal_eval(tool_message.content) for tool_message in tool_messages
+                ast.literal_eval(str(tool_message.content))
+                for tool_message in tool_messages
             ]
             tool_content_args = {}
             for tool_content in tool_contents:
@@ -97,24 +98,33 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
             try:
                 output = output_model.model_validate(tool_content_args)
             except Exception as e:
-                return self.output_state_model(
-                    messages=self.get_messages("failure", error=e),
-                    output=None,
-                    error_message=str(e),
-                    condition="failure",
+                return cast(
+                    OutputState,
+                    self.output_state_model(
+                        messages=self.get_messages("failure", error=e),
+                        output=None,
+                        error_message=str(e),
+                        condition="failure",
+                    ),
                 )
 
-            return self.output_state_model(
-                messages=self.get_messages("success"),
-                output=output,
-                condition="success",
+            return cast(
+                OutputState,
+                self.output_state_model(
+                    messages=self.get_messages("success"),
+                    output=output,
+                    condition="success",
+                ),
             )
 
         except Exception as e:
             # TODO(xabier): send a different condition (eg validation_error vs other_error)
-            return self.output_state_model(
-                messages=self.get_messages("failure", error=e),
-                output=None,
-                error_message=str(e),
-                condition="failure",
+            return cast(
+                OutputState,
+                self.output_state_model(
+                    messages=self.get_messages("failure", error=e),
+                    output=None,
+                    error_message=str(e),
+                    condition="failure",
+                ),
             )

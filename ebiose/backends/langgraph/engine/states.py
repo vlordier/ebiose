@@ -23,7 +23,7 @@ class LangGraphEngineInputState(BaseModel):
 class LangGraphEngineOutputState(BaseModel):
     messages: Annotated[Sequence[AnyMessage], add_messages] = []
     error_message: str = ""
-    output: BaseModel | None = Field(default=None, serialization_exclude=True)
+    output: BaseModel | None = Field(default=None)
 
     @computed_field
     @property
@@ -40,10 +40,7 @@ class LangGraphEngineContext(BaseModel):
         ...,
         description="The id of the model endpoint to use",
     )
-    output_model: type[BaseModel] | None = Field(
-        default=None,
-        serialization_exclude=True,
-    )
+    output_model: type[BaseModel] | None = Field(default=None)
     shared_context_prompt: str
     recursion_limit: int = Field(default=15)
     tags: list[str] = Field(default_factory=list)

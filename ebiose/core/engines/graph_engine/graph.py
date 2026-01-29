@@ -66,7 +66,7 @@ class Graph(BaseModel):
         msg += self.__validate_outgoing_conditional_edges()
 
         # check edges and nodes
-        node_ids = {node.id for node in self.nodes}
+        node_ids = {getattr(node, "id", str(node)) for node in self.nodes}
         node_ids_in_edges = set(
             [edge.start_node_id for edge in self.edges]
             + [edge.end_node_id for edge in self.edges],

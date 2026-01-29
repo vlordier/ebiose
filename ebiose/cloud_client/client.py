@@ -388,10 +388,13 @@ class EbioseCloudClient:
 
     # --- ApiKey Endpoints ---
     def add_api_key(self, data: ApiKeyInputModel) -> bool:
-        return self._request("POST", "/apikeys", json_data=data)
+        return bool(self._request("POST", "/apikeys", json_data=data))
 
     def get_api_keys(self) -> list[ApiKeyOutputModel]:
-        return [ApiKeyOutputModel(**item) for item in self._request("GET", "/apikeys")]
+        response = self._request("GET", "/apikeys")
+        if isinstance(response, list):
+            return [ApiKeyOutputModel(**item) for item in response]
+        return []
 
     def self_add_api_key(self, data: SelfApiKeyInputModel) -> bool:
         return self._request("POST", "/apikeys/self", json_data=data)

@@ -50,9 +50,11 @@ event_logger = _logger
 
 def elastic_sink(message: "Message") -> None:
     record = message.record
-    record_extra = record.pop("extra", {})
-    event_payload = record_extra.pop("event_payload", None)
-    log_doc = record_extra
+    record_extra = record.get("extra", {})
+    event_payload = (
+        record_extra.get("event_payload") if isinstance(record_extra, dict) else None
+    )
+    log_doc = dict(record_extra) if isinstance(record_extra, dict) else {}
     if event_payload is not None:
         log_doc.update(event_payload)
     log_doc["loguru"] = {

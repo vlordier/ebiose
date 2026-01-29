@@ -150,7 +150,7 @@ class LangGraphRoutingNode(RoutingNode):
         return cast(
             Dict[str, Any],
             self.output_state_model(
-                messages=self.get_messages()
+                messages=self.get_messages("error", error_message)
                 if hasattr(self, "output_state_model")
                 else [],
                 error_message=error_message,
