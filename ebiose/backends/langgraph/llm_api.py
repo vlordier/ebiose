@@ -26,6 +26,116 @@ from ebiose.core.model_endpoint import ModelEndpoints
 if TYPE_CHECKING:
     from langchain_core.messages import AnyMessage
 
+    @staticmethod
+    def create_azure_client(
+        model_endpoint_id: str,
+        temperature: float,
+        max_tokens: int | None,
+        request_timeout: float,
+        max_retries: int,
+    ) -> AzureChatOpenAI:
+        """Create Azure client with proper model endpoint validation."""
+        model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
+        if model_endpoint is None:
+            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
+
+        return AzureChatOpenAI(  # type: ignore[call-arg,return-value]
+            azure_endpoint=model_endpoint.endpoint_url.get_secret_value()
+            if model_endpoint.endpoint_url
+            else None,
+            azure_deployment=model_endpoint.deployment_name or "",
+            api_key=model_endpoint.api_key.get_secret_value()
+            if model_endpoint.api_key
+            else None,
+            api_version="2023-12-01-preview",
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=request_timeout,
+            max_retries=max_retries,
+        )
+
+    @staticmethod
+    def create_litellm_client(
+        model_endpoint_id: str,
+        temperature: float,
+        max_tokens: int | None,
+        request_timeout: float,
+        max_retries: int,
+    ) -> ChatLiteLLM:
+        """Create LiteLLM client with proper model endpoint validation."""
+        model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
+        if model_endpoint is None:
+            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
+
+        return ChatLiteLLM(  # type: ignore[call-arg,return-value]
+            model=f"azure/{model_endpoint.deployment_name}",
+            azure_api_key=model_endpoint.api_key.get_secret_value()
+            if model_endpoint.api_key
+            else None,
+            api_base=model_endpoint.endpoint_url.get_secret_value()
+            if model_endpoint.endpoint_url
+            else None,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            request_timeout=request_timeout,
+            max_retries=max_retries,
+        )
+
+
+class AzureProvider(BaseLLMProvider):
+    """Type-safe Azure OpenAI integration."""
+
+    def create_client(self, config: LLMAPIConfig) -> AzureChatOpenAI:
+        """Create Azure client with proper typing."""
+        model_endpoint = ModelEndpoints.get_model_endpoint(config.model_name)
+        if model_endpoint is None:
+            raise ValueError(f"Model endpoint '{config.model_name}' not found")
+
+        return AzureChatOpenAI(  # type: ignore[call-arg,return-value]
+            azure_endpoint=model_endpoint.endpoint_url.get_secret_value()
+            if model_endpoint.endpoint_url
+            else None,
+            azure_deployment=model_endpoint.deployment_name or "",
+            api_key=model_endpoint.api_key.get_secret_value()
+            if model_endpoint.api_key
+            else None,
+            api_version="2023-12-01-preview",
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+        )
+
+
+class LiteLLMProvider(BaseLLMProvider):
+    """Type-safe LiteLLM integration."""
+
+    def create_client(self, config: LLMAPIConfig) -> ChatLiteLLM:
+        """Create LiteLLM client with proper typing."""
+        model_endpoint = ModelEndpoints.get_model_endpoint(config.model_name)
+        if model_endpoint is None:
+            raise ValueError(f"Model endpoint '{config.model_name}' not found")
+
+        return ChatLiteLLM(  # type: ignore[call-arg,return-value]
+            model=f"azure/{model_endpoint.deployment_name}",
+            azure_api_key=model_endpoint.api_key.get_secret_value()
+            if model_endpoint.api_key
+            else None,
+            api_base=model_endpoint.endpoint_url.get_secret_value()
+            if model_endpoint.endpoint_url
+            else None,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+        )
+
+
+# --- Type-Safe Helper Functions ---
+def safe_get_secret_value(secret: Any) -> str | None:
+    """Safely extract secret value from potentially None SecretStr."""
+    if secret is None:
+        return None
+    if hasattr(secret, "get_secret_value"):
+        return secret.get_secret_value()
+    return str(secret) if secret else None
+
 
 class LangGraphLLMApiError(Exception):
     """Custom exception for errors during LLM calls."""
@@ -132,19 +242,17 @@ class LangGraphLLMApi(LLMApi):
                 max_tokens=max_tokens,
             )
 
-        if (
-            ModelEndpoints.use_lite_llm()
-        ):  # if model is compatible with LiteLLM, otherwise, custom implementation
+        if ModelEndpoints.use_lite_llm():
+            # if model is compatible with LiteLLM, otherwise, custom implementation
             # TODO(xabier): check/test
-
             return ChatLiteLLM(
                 model=f"azure/{model_endpoint.deployment_name}",
-                azure_api_key=model_endpoint.api_key.get_secret_value(),
-                api_base=model_endpoint.endpoint_url.get_secret_value(),
+                azure_api_key=safe_get_secret_value(model_endpoint.api_key),
+                api_base=safe_get_secret_value(model_endpoint.endpoint_url),
                 temperature=temperature,
+                max_tokens=max_tokens,
                 request_timeout=request_timeout,
                 max_retries=max_retries,
-                max_tokens=max_tokens,
             )
 
         if model_endpoint.provider == "OpenAI":

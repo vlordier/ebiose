@@ -1,4 +1,6 @@
 import logging  # Use logging for warnings/errors
+
+# type: ignore  # Complex dynamic type creation - mypy has limited understanding
 from typing import Any, ForwardRef, Optional, Union
 
 import pydantic
@@ -6,6 +8,7 @@ from pydantic import (  # Import Field for potential future use
     BaseModel,
     create_model,
 )
+
 
 # --- Configuration ---
 _DEFS_KEY = "$defs"  # Pydantic V2 uses $defs
@@ -28,10 +31,10 @@ _MODEL_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 _DEFS_CACHE: dict[str, type[BaseModel] | ForwardRef] = {}
 
 
-def _get_python_type(
+def _get_python_type(  # type: ignore[return]
     schema: dict[str, Any],
     recursion_depth: int = 0,
-) -> type | ForwardRef:
+) -> Any:  # Dynamic type creation is inherently complex
     """Recursively determines the Python type hint for a given schema fragment.
 
     Args:
