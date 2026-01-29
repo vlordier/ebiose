@@ -185,6 +185,7 @@ class Graph(BaseModel):
                         },
                     },
                 )
+                continue
 
             # turn int id into str
             if "id" in node and isinstance(node["id"], int):

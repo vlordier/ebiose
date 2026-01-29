@@ -397,7 +397,7 @@ class EbioseCloudClient:
         return []
 
     def self_add_api_key(self, data: SelfApiKeyInputModel) -> bool:
-        return self._request("POST", "/apikeys/self", json_data=data)
+        return bool(self._request("POST", "/apikeys/self", json_data=data))
 
     def self_get_api_keys(self) -> list[ApiKeyOutputModel]:
         return [
@@ -447,7 +447,7 @@ class EbioseCloudClient:
         )
 
     def refresh_token(self, token: str) -> str:
-        return self._request("GET", "/auth/refresh-token", params={"token": token})
+        return str(self._request("GET", "/auth/refresh-token", params={"token": token}))
 
     def user_info(self) -> UserOutputModel:
         return UserOutputModel(**self._request("GET", "/auth/user-info"))
@@ -731,10 +731,12 @@ class EbioseAPIClient:
     # --- ApiKey Facade ---
     @classmethod
     def add_new_api_key(cls, data: ApiKeyInputModel) -> bool:
-        return cls._handle_request(
-            "add new API key",
-            cls._get_client().add_api_key,
-            data=data,
+        return bool(
+            cls._handle_request(
+                "add new API key",
+                cls._get_client().add_api_key,
+                data=data,
+            )
         )
 
     # --- Forge Facade (with new methods) ---

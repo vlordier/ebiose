@@ -68,9 +68,11 @@ class AgentFactory:
 
         # TODO(xabier): remove when agent_type is implemented server-side
         agent_type = None
-        if "architect" in response_dict.name:
+        if response_dict.name and "architect" in response_dict.name:
             agent_type = "architect"
-        elif "crossover" in response_dict.name or "mutation" in response_dict.name:
+        elif response_dict.name and (
+            "crossover" in response_dict.name or "mutation" in response_dict.name
+        ):
             agent_type = "genetic_operator"
 
         return Agent(

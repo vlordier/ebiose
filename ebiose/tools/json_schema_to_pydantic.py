@@ -181,7 +181,7 @@ def _get_python_type(
             return Union[final_type, type(None)]  # type: ignore[return-value]
         return final_type
     # Use Union[] for multiple types
-    union_type = Union[tuple(actual_types)]  # type: ignore[arg-type,return-value]
+    union_type = Union[tuple(actual_types)]  # type: ignore[arg-type,return-value,valid-type]
     if has_null:
         return Union[union_type, type(None)]  # type: ignore[return-value]
     return union_type  # type: ignore[return-value]
