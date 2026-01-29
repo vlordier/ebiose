@@ -32,6 +32,9 @@ ES_INDEX = "test-pva4"
 
 def build_agent_input_model(agent: "Agent", forge_cycle_id: str) -> AgentInputModel:
     """Format the agent for the API."""
+    if agent.agent_engine is None:
+        raise ValueError(f"Agent {agent.id} has no engine")
+
     agent_engine = AgentEngineInputModel(
         engineType=agent.agent_engine.engine_type,
         configuration=agent.agent_engine.serialize_configuration(),
@@ -280,7 +283,9 @@ class EbioseAPIClient:
         *,
         return_ids_only: bool,
     ) -> list[str] | list["Agent"] | None:
-        response = cls._get_client().list_agents_in_ecosystem(ecosystem_uuid=ecosystem_id)
+        response = cls._get_client().list_agents_in_ecosystem(
+            ecosystem_uuid=ecosystem_id
+        )
         if return_ids_only:
             return [r.uuid for r in response if r.uuid is not None]
 

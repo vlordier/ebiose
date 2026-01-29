@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import requests
 from loguru import logger
@@ -742,36 +742,48 @@ class EbioseAPIClient:
     # --- Forge Facade (with new methods) ---
     @classmethod
     def list_all_forges(cls) -> list[ForgeOutputModel]:
-        return cls._handle_request("list all forges", cls._get_client().get_forges)
+        return cast(
+            list[ForgeOutputModel],
+            cls._handle_request("list all forges", cls._get_client().get_forges),
+        )
 
     @classmethod
     def add_new_forge(cls, data: ForgeInputModel) -> ForgeOutputModel:
-        return cls._handle_request(
-            "add new forge",
-            cls._get_client().add_forge,
-            data=data,
+        return cast(
+            ForgeOutputModel,
+            cls._handle_request(
+                "add new forge",
+                cls._get_client().add_forge,
+                data=data,
+            ),
         )
 
     @classmethod
     def get_specific_forge(cls, forge_uuid: str) -> ForgeOutputModel:
-        return cls._handle_request(
-            f"get forge {forge_uuid}",
-            cls._get_client().get_forge,
-            forge_uuid=forge_uuid,
+        return cast(
+            ForgeOutputModel,
+            cls._handle_request(
+                f"get forge {forge_uuid}",
+                cls._get_client().get_forge,
+                forge_uuid=forge_uuid,
+            ),
         )
 
     @classmethod
     def modify_forge(cls, forge_uuid: str, data: ForgeInputModel) -> ForgeOutputModel:
-        return cls._handle_request(
-            f"update forge {forge_uuid}",
-            cls._get_client().update_forge,
-            forge_uuid=forge_uuid,
-            data=data,
+        return cast(
+            ForgeOutputModel,
+            cls._handle_request(
+                f"update forge {forge_uuid}",
+                cls._get_client().update_forge,
+                forge_uuid=forge_uuid,
+                data=data,
+            ),
         )
 
     @classmethod
     def remove_forge(cls, forge_uuid: str) -> None:
-        return cls._handle_request(
+        cls._handle_request(
             f"delete forge {forge_uuid}",
             cls._get_client().delete_forge,
             forge_uuid=forge_uuid,

@@ -52,6 +52,9 @@ class LangGraphEngine(GraphEngine):
 
     @model_validator(mode="after")
     def _set_llm_models(self) -> Self:
+        if self.configuration is None:
+            raise ValueError("Configuration must be provided")
+
         if self.input_model is None:
             self.input_model = create_pydantic_model_from_schema(
                 self.configuration["input_model"],

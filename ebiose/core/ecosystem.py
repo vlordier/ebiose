@@ -27,7 +27,7 @@ class Ecosystem(BaseModel):
     initial_genetic_operator_agents: list["Agent"] | None = None
     agents: dict[str, "Agent"] = {}
     forge_list: ClassVar[list[AgentForge]] = []
-    agent_forge_distances: ClassVar[dict[AgentForge, SortedList]] = {}
+    agent_forge_distances: ClassVar[dict[str, SortedList]] = {}
     model_endpoint_ids: ClassVar[list[str]] = []
 
     @classmethod

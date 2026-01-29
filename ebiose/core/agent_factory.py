@@ -80,13 +80,13 @@ class AgentFactory:
 
         return Agent(
             id=agent_id,
-            name=response_dict.name,
+            name=response_dict.name or f"agent-{agent_id}",
             agent_type=agent_type,
             description=response_dict.description,
             architect_agent_id=response_dict.architectAgentUuid,
             genetic_operator_agent_id=response_dict.geneticOperatorAgentUuid,
             agent_engine=agent_engine,
-            parent_ids=response_dict.parentAgentUuids,
+            parent_ids=response_dict.parentAgentUuids or [],
         )
 
     @staticmethod

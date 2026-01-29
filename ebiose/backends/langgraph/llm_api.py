@@ -106,6 +106,9 @@ class LangGraphLLMApi(LLMApi):
 
         model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
 
+        if model_endpoint is None:
+            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
+
         if cls.mode == "cloud":
             return ChatOpenAI(  # type: ignore[call-arg,return-value]
                 openai_api_key=cls.lite_llm_api_key,
