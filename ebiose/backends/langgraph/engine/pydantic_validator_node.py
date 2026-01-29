@@ -75,13 +75,15 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
 
     async def call_node(
         self,
-        state: InputState | dict,
-        runtime: Runtime[BaseModel],
-    ) -> OutputState:
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
         try:
-            # Handle union type: state can be InputState or dict
+            # Handle union type: state can be BaseModel or dict
             messages = (
-                state.get("messages", []) if isinstance(state, dict) else state.messages
+                state.get("messages", [])
+                if isinstance(state, dict)
+                else getattr(state, "messages", [])
             )
 
             tool_messages = []
@@ -91,7 +93,7 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
                 else:
                     break
 
-            output_model = runtime.context.output_model
+            output_model = getattr(config, "output_model", None) if config else None
             tool_contents = [
                 ast.literal_eval(str(tool_message.content))
                 for tool_message in tool_messages
@@ -101,35 +103,28 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
                 tool_content_args.update(tool_content["args"])
 
             try:
+                if output_model is None or not hasattr(output_model, "model_validate"):
+                    raise ValueError("Output model not properly configured")
                 output = output_model.model_validate(tool_content_args)
             except Exception as e:
-                return cast(
-                    OutputState,
-                    self.output_state_model(
-                        messages=self.get_messages("failure", error=e),
-                        output=None,
-                        error_message=str(e),
-                        condition="failure",
-                    ),
-                )
+                return {
+                    "messages": self.get_messages("failure", error=e),
+                    "output": None,
+                    "error_message": str(e),
+                    "condition": "failure",
+                }
 
-            return cast(
-                OutputState,
-                self.output_state_model(
-                    messages=self.get_messages("success"),
-                    output=output,
-                    condition="success",
-                ),
-            )
+            return {
+                "messages": self.get_messages("success"),
+                "output": output,
+                "condition": "success",
+            }
 
         except Exception as e:
             # TODO(xabier): send a different condition (eg validation_error vs other_error)
-            return cast(
-                OutputState,
-                self.output_state_model(
-                    messages=self.get_messages("failure", error=e),
-                    output=None,
-                    error_message=str(e),
-                    condition="failure",
-                ),
-            )
+            return {
+                "messages": self.get_messages("failure", error=e),
+                "output": None,
+                "error_message": str(e),
+                "condition": "failure",
+            }

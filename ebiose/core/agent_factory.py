@@ -8,11 +8,33 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
+
+from pydantic import BaseModel, Field
 
 from loguru import logger
 
 from ebiose.cloud_client.client import AgentOutputModel
+
+
+# --- Agent Configuration Models ---
+class AgentEngineConfig(BaseModel):
+    """Configuration for agent engines."""
+
+    engine_type: str
+    configuration: dict[str, Any]
+
+
+class AgentConfig(BaseModel):
+    """Complete agent configuration model."""
+
+    id: str | None = None
+    name: str | None = None
+    description: str | None = None
+    agent_engine: AgentEngineConfig
+    architect_agent: str | None = None
+    genetic_operator_agent: str | None = None
+
 
 if TYPE_CHECKING:
     from pydantic import BaseModel

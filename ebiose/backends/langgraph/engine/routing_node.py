@@ -77,8 +77,8 @@ class LangGraphRoutingNode(RoutingNode):
 
     async def call_node(
         self,
-        state: InputState | dict,
-        runtime: Runtime[BaseModel],
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
     ) -> dict:
         # Handle union type: state can be InputState or dict
         if isinstance(state, dict):
@@ -115,14 +115,19 @@ class LangGraphRoutingNode(RoutingNode):
             else:
                 last_message_str = ""
         else:
-            # state is InputState
-            if len(state.messages) == 0:
-                content = cast(str, state.last_message.content)
+            # state is BaseModel - use getattr for safety
+            messages = getattr(state, "messages", [])
+            last_message = getattr(state, "last_message", None)
+            possible_output = getattr(state, "possible_output", [])
+
+            if len(messages) == 0 and last_message:
+                content = str(getattr(last_message, "content", ""))
+            elif len(messages) > 0:
+                last_msg = messages[-1]
+                content = str(getattr(last_msg, "content", ""))
             else:
-                last_msg = cast(AnyMessage, state.messages[-1])
-                content = cast(str, last_msg.content)
+                content = ""
             last_message_str = content.lower()
-            possible_output = state.possible_output
 
         output_condition = None
         count = 0

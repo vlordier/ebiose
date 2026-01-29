@@ -53,6 +53,34 @@ class ResponseValidator(Generic[T]):
             ) from e
 
 
+# --- API Response Models ---
+class APIResponse(BaseModel):
+    """Base API response wrapper."""
+
+    success: bool = True
+    errors: list[str] | None = None
+
+
+class SingleResponse(APIResponse, Generic[T]):
+    """Response containing a single item."""
+
+    data: T | None = None
+
+
+class ListResponse(APIResponse, Generic[T]):
+    """Response containing a list of items."""
+
+    data: list[T] | None = None
+
+
+class PaginatedResponse(ListResponse[T]):
+    """Response with pagination information."""
+
+    total: int | None = None
+    page: int | None = None
+    page_size: int | None = None
+
+
 # --- Custom Exceptions ---
 class EbioseCloudError(Exception):
     """Base exception for EbioseCloud API errors."""
@@ -784,27 +812,32 @@ class EbioseAPIClient:
 
     # --- Forge Facade (with new methods) ---
     @classmethod
-    def list_all_forges(cls) -> list[ForgeOutputModel]:
+    def list_all_forges(cls) -> ListResponse[ForgeOutputModel]:
         response = cls._handle_request("list all forges", cls._get_client().get_forges)
-        return ResponseValidator.validate_list_response(response, ForgeOutputModel)
+        validated_data = ResponseValidator.validate_list_response(
+            response, ForgeOutputModel
+        )
+        return ListResponse(data=validated_data)
 
     @classmethod
-    def add_new_forge(cls, data: ForgeInputModel) -> ForgeOutputModel:
+    def add_new_forge(cls, data: ForgeInputModel) -> SingleResponse[ForgeOutputModel]:
         response = cls._handle_request(
             "add new forge",
             cls._get_client().add_forge,
             data=data,
         )
-        return ResponseValidator.validate_response(response, ForgeOutputModel)
+        validated_data = ResponseValidator.validate_response(response, ForgeOutputModel)
+        return SingleResponse(data=validated_data)
 
     @classmethod
-    def get_specific_forge(cls, forge_uuid: str) -> ForgeOutputModel:
+    def get_specific_forge(cls, forge_uuid: str) -> SingleResponse[ForgeOutputModel]:
         response = cls._handle_request(
             f"get forge {forge_uuid}",
             cls._get_client().get_forge,
             forge_uuid=forge_uuid,
         )
-        return ResponseValidator.validate_response(response, ForgeOutputModel)
+        validated_data = ResponseValidator.validate_response(response, ForgeOutputModel)
+        return SingleResponse(data=validated_data)
 
     @classmethod
     def modify_forge(cls, forge_uuid: str, data: ForgeInputModel) -> ForgeOutputModel:
