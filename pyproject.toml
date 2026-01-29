@@ -84,6 +84,10 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+# Advanced features
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+enable_incomplete_namespace_package = true
+extra_checks = true
 exclude = [
     "notebooks/",
     "ebiose/generated_cloud_sdk/",
@@ -127,7 +131,10 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "types-aiofiles>=25.1.0.20251011",
+    "types-psutil>=7.2.1.20260116",
     "types-pyyaml>=6.0.12.20250915",
     "types-requests>=2.32.4.20260107",
     "types-tqdm>=4.67.0.20250809",
+    "types-tzlocal>=5.1.0.1",
 ]
