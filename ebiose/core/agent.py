@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, cast
 
 from langfuse import observe
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
@@ -69,8 +69,12 @@ class Agent(BaseModel):
 
     @model_validator(mode="after")
     def generate_embeddings(self) -> Self:
-        if self.description_embedding is None:
-            self.description_embedding = generate_embeddings(self.description)
+        if self.description_embedding is None and self.description is not None:
+            embedding = generate_embeddings(self.description)
+            self.description_embedding = cast(
+                list[float],
+                embedding.tolist() if hasattr(embedding, "tolist") else list(embedding),
+            )
         return self
 
     @observe(name="run_agent")

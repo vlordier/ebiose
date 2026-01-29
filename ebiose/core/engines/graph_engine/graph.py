@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from typing import Any, Literal, LiteralString, Self
+from typing import Any, Literal, LiteralString, Self, cast
 
 from pydantic import (
     BaseModel,
@@ -220,8 +220,9 @@ class Graph(BaseModel):
                 continue
 
             try:
+                node_class = cast(type[BaseModel], node_types_map[node_type])
                 validated_nodes.append(
-                    node_types_map[node_type].model_validate(node),
+                    node_class.model_validate(node),
                 )
             except ValidationError as e:
                 for error in e.errors():
