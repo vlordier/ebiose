@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from langchain_core.messages import ToolMessage
 from langgraph.runtime import Runtime
@@ -41,38 +41,55 @@ class LangGraphToolNode(BaseNode):
     output_state_model: type[BaseModel] = OutputState
 
     @computed_field
-    def tools_by_name(self) -> dict:
+    def tools_by_name(self) -> dict[str, Any]:
         """Returns a dictionary mapping tool names to their respective Tool objects."""
         return {tool.name: tool for tool in self.tools}
 
     async def call_node(
         self,
-        state: InputState,
-        runtime: Runtime[BaseModel],
-    ) -> OutputState:
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
         try:
             outputs = []
             # Handle both dict and structured state
-            messages = (
-                state.get("messages", state.messages)
-                if isinstance(state, dict)
-                else state.messages
-            )
+            if isinstance(state, dict):
+                messages = state.get("messages", [])
+            else:
+                # Assume BaseModel with messages attribute
+                messages = getattr(state, "messages", [])
             last_message = messages[-1] if messages else None
             tool_calls = getattr(last_message, "tool_calls", []) if last_message else []
 
             for tool_call in tool_calls:
-                tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                    tool_call["args"],
-                )
-                outputs.append(
-                    ToolMessage(
-                        content=json.dumps(tool_result),
-                        name=tool_call["name"],
-                        tool_call_id=tool_call["id"],
-                    ),
-                )
-            return OutputState(messages=outputs)
+                if (
+                    isinstance(tool_call, dict)
+                    and "name" in tool_call
+                    and "args" in tool_call
+                ):
+                    try:
+                        tool_name = str(tool_call["name"])
+                        tools_dict = self.tools_by_name
+                        if callable(tools_dict):
+                            tools_dict = tools_dict()  # Call the computed field
+
+                        if isinstance(tools_dict, dict) and tool_name in tools_dict:
+                            tool_result = tools_dict[tool_name].invoke(
+                                tool_call["args"],
+                            )
+                            outputs.append(
+                                ToolMessage(
+                                    content=json.dumps(tool_result),
+                                    name=tool_call.get("name", ""),
+                                    tool_call_id=tool_call.get("id", ""),
+                                ),
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to invoke tool {tool_call.get('name', 'unknown')}: {e}"
+                        )
+                        continue
+            return {"messages": outputs}
 
         except Exception as e:
             logger.debug(f"Error when calling node {self.name}: {e!s}")

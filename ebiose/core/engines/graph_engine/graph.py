@@ -133,7 +133,7 @@ class Graph(BaseModel):
 
     @field_validator("nodes", mode="before")
     @classmethod
-    def validate_nodes(cls, nodes: Any) -> list[NodeTypes]:
+    def validate_nodes(cls, nodes: Any) -> list[BaseNode]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
         if not isinstance(nodes, list):
             msg = "Field 'nodes' should be a list"
