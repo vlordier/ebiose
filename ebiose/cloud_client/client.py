@@ -3,11 +3,54 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, cast
+from typing import Any, Callable, cast, TypeVar, Generic
 
 import requests
 from loguru import logger
 from pydantic import BaseModel
+
+
+# --- Type-Safe Response Handling ---
+T = TypeVar("T", bound=BaseModel)
+
+
+class ResponseValidator(Generic[T]):
+    """Generic response validator using pydantic models."""
+
+    @staticmethod
+    def validate_response(response_data: Any, model_type: type[T]) -> T:
+        """Validate and parse API response using pydantic model."""
+        try:
+            if isinstance(response_data, dict):
+                return model_type.model_validate(response_data)
+            elif isinstance(response_data, list) and issubclass(model_type, list):
+                # Handle list responses - this is tricky, let's cast for now
+                return cast(T, response_data)
+            else:
+                # Fallback for unexpected response types
+                return cast(T, response_data)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to validate response as {model_type.__name__}: {e}"
+            ) from e
+
+    @staticmethod
+    def validate_list_response(response_data: Any, model_type: type[T]) -> list[T]:
+        """Validate and parse list API responses."""
+        try:
+            if isinstance(response_data, list):
+                return [
+                    model_type.model_validate(item)
+                    if isinstance(item, dict)
+                    else cast(T, item)
+                    for item in response_data
+                ]
+            else:
+                raise ValueError(f"Expected list response, got {type(response_data)}")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to validate list response as {model_type.__name__}: {e}"
+            ) from e
 
 
 # --- Custom Exceptions ---
@@ -742,44 +785,36 @@ class EbioseAPIClient:
     # --- Forge Facade (with new methods) ---
     @classmethod
     def list_all_forges(cls) -> list[ForgeOutputModel]:
-        return cast(
-            list[ForgeOutputModel],
-            cls._handle_request("list all forges", cls._get_client().get_forges),
-        )
+        response = cls._handle_request("list all forges", cls._get_client().get_forges)
+        return ResponseValidator.validate_list_response(response, ForgeOutputModel)
 
     @classmethod
     def add_new_forge(cls, data: ForgeInputModel) -> ForgeOutputModel:
-        return cast(
-            ForgeOutputModel,
-            cls._handle_request(
-                "add new forge",
-                cls._get_client().add_forge,
-                data=data,
-            ),
+        response = cls._handle_request(
+            "add new forge",
+            cls._get_client().add_forge,
+            data=data,
         )
+        return ResponseValidator.validate_response(response, ForgeOutputModel)
 
     @classmethod
     def get_specific_forge(cls, forge_uuid: str) -> ForgeOutputModel:
-        return cast(
-            ForgeOutputModel,
-            cls._handle_request(
-                f"get forge {forge_uuid}",
-                cls._get_client().get_forge,
-                forge_uuid=forge_uuid,
-            ),
+        response = cls._handle_request(
+            f"get forge {forge_uuid}",
+            cls._get_client().get_forge,
+            forge_uuid=forge_uuid,
         )
+        return ResponseValidator.validate_response(response, ForgeOutputModel)
 
     @classmethod
     def modify_forge(cls, forge_uuid: str, data: ForgeInputModel) -> ForgeOutputModel:
-        return cast(
-            ForgeOutputModel,
-            cls._handle_request(
-                f"update forge {forge_uuid}",
-                cls._get_client().update_forge,
-                forge_uuid=forge_uuid,
-                data=data,
-            ),
+        response = cls._handle_request(
+            f"update forge {forge_uuid}",
+            cls._get_client().update_forge,
+            forge_uuid=forge_uuid,
+            data=data,
         )
+        return ResponseValidator.validate_response(response, ForgeOutputModel)
 
     @classmethod
     def remove_forge(cls, forge_uuid: str) -> None:

@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, Self, cast
+from typing import Any, Literal, Self, cast, Union, Optional
 
 from langfuse import observe
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
@@ -18,6 +18,9 @@ from ebiose.core.agent_engine_factory import AgentEngineFactory
 from ebiose.tools.embedding_helper import generate_embeddings
 
 
+# Agent type literals for better type safety
+
+
 class Agent(BaseModel):
     id: str = Field(default_factory=lambda: "agent-" + str(uuid.uuid4()))
     name: str
@@ -25,13 +28,26 @@ class Agent(BaseModel):
     description: str | None = None
     architect_agent_id: str | None = None
     genetic_operator_agent_id: str | None = None
-    architect_agent: Agent | None = (
+    architect_agent: "Agent" | None = (
         None  # Reference to the architect agent if this is a generated agent
     )
     parent_ids: list[str] = Field(default_factory=list)
 
     agent_engine: AgentEngine | None = Field(default=None)
     description_embedding: list[float] | None = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def validate_agent_type_consistency(self) -> Self:
+        """Validate that agent type fields are consistent."""
+        if self.agent_type == "architect" and not self.architect_agent_id:
+            # For architects, we might not have an architect_agent_id
+            pass
+        elif (
+            self.agent_type == "genetic_operator" and not self.genetic_operator_agent_id
+        ):
+            # For genetic operators, we might not have a genetic_operator_agent_id
+            pass
+        return self
 
     model_config = ConfigDict(
         alias_generator=to_camel,
