@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from IPython import get_ipython
@@ -19,7 +19,6 @@ if get_ipython() is not None:
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 
-from ebiose.core.agent import Agent
 from ebiose.core.forge_cycle import (
     ForgeCycle,
     ForgeCycleConfig,
@@ -27,6 +26,7 @@ from ebiose.core.forge_cycle import (
 from ebiose.tools.embedding_helper import generate_embeddings
 
 if TYPE_CHECKING:
+    from ebiose.core.agent import Agent
     from ebiose.core.ecosystem import Ecosystem
 
 
@@ -44,7 +44,11 @@ class AgentForge(BaseModel):
     @property
     def description_embedding(self) -> list[float]:
         if self._description_embedding is None:
-            self._description_embedding = generate_embeddings(self.description)
+            embedding = generate_embeddings(self.description)
+            self._description_embedding = cast(
+                "list[float]",
+                embedding.tolist() if hasattr(embedding, "tolist") else list(embedding),
+            )
         return self._description_embedding
 
     @field_validator("default_model_endpoint_id", mode="after")
@@ -58,7 +62,7 @@ class AgentForge(BaseModel):
     async def compute_fitness(
         self,
         agent: Agent,
-        **kwargs: dict[str, any],
+        **kwargs: str | float | bool | BaseModel,
     ) -> tuple[str, float]:
         pass
 
@@ -66,7 +70,7 @@ class AgentForge(BaseModel):
         self,
         config: ForgeCycleConfig,
         ecosystem: Ecosystem | None = None,
-    ) -> list[Agent]:
+    ) -> tuple[dict[str, Agent], dict[str, float]]:
         cycle = ForgeCycle(forge=self, config=config)
 
         return await cycle.execute_a_cycle(ecosystem)
@@ -82,7 +86,13 @@ class AgentForge(BaseModel):
         if get_ipython() is None:
             for agent_id, fitness_value in sorted_fitness.items():
                 agent = agents[agent_id]
-                mermaid_str = agent.agent_engine.graph.to_mermaid_str(orientation="LR")
+                agent_engine = agent.agent_engine
+                if agent_engine is None:
+                    continue
+                agent_graph = getattr(agent_engine, "graph", None)
+                if agent_graph is None:
+                    continue
+                mermaid_str = agent_graph.to_mermaid_str(orientation="LR")
                 logger.info(
                     f"Agent ID: {agent_id}, fitness: {fitness_value} \n{mermaid_str}",
                 )
@@ -90,17 +100,25 @@ class AgentForge(BaseModel):
             markdown_str = ""
             for agent_id, fitness_value in sorted_fitness.items():
                 agent = agents[agent_id]
+                agent_engine = agent.agent_engine
+                if agent_engine is None:
+                    continue
+                agent_graph = getattr(agent_engine, "graph", None)
+                if agent_graph is None:
+                    continue
 
                 markdown_str += f"# Agent ID: {agent_id}\n"
                 markdown_str += f"## Fitness: {fitness_value}\n"
                 markdown_str += "```mermaid \n"
                 markdown_str += (
-                    f"{agent.agent_engine.graph.to_mermaid_str(orientation='LR')} \n"
+                    f"{agent_graph.to_mermaid_str(orientation='LR')} \n"
                 )
                 markdown_str += "``` \n"
                 markdown_str += "## Prompts:\n"
-                markdown_str += f"##### Shared context prompt\n{agent.agent_engine.graph.shared_context_prompt}\n"
-                for node in agent.agent_engine.graph.nodes:
+                markdown_str += (
+                    f"##### Shared context prompt\n{agent_graph.shared_context_prompt}\n"
+                )
+                for node in agent_graph.nodes:
                     if node.type == "LLMNode":
                         markdown_str += f"##### {node.name}\n{node.prompt}\n"
                 markdown_str += "\n"

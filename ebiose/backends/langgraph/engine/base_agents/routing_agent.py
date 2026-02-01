@@ -5,21 +5,23 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import AnyMessage
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from ebiose.core.agent import Agent
-
+from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
 from ebiose.backends.langgraph.engine.routing_node import (
     LangGraphRoutingNode,
 )
+from ebiose.core.agent import Agent
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
+
+if TYPE_CHECKING:
+    from langchain_core.messages import AnyMessage
 
 SHARED_CONTEXT_PROMPT = """You are part of a router agent that must analyse the
 following message and decide which condition applies best amongst: {possible_output}.
@@ -37,10 +39,7 @@ class AgentOutput(BaseModel):
     output_condition: str | None = None
 
 
-def init_routing_agent(model_endpoint_id: str) -> "Agent":
-    from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
-    from ebiose.core.agent import Agent
-
+def init_routing_agent(model_endpoint_id: str) -> Agent:
     shared_context_prompt = SHARED_CONTEXT_PROMPT
 
     llm_router_node = LLMNode(
@@ -48,7 +47,7 @@ def init_routing_agent(model_endpoint_id: str) -> "Agent":
         name="llm_router",
         purpose="This node is a router to select the next node to route to.",
         prompt="Append the selected condition to the end of your response.",
-        temperature=0.0,  # type: ignore[call-arg]
+        temperature=0.0,
     )
 
     routing_node = LangGraphRoutingNode(id="routing_node", name="routing_node")

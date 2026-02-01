@@ -5,16 +5,14 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from ebiose.core.agent import Agent
-
+from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
+from ebiose.backends.langgraph.engine.llm_node import LangGraphLLMNode
+from ebiose.core.agent import Agent
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
 
@@ -25,31 +23,6 @@ class AgentInput(BaseModel):
     random_n_llm_nodes: bool = True
     node_types_description: str | None = None
     n_llm_nodes_constraint_string: str | None = None
-
-    # @computed_field
-    # @property
-    # def _node_types_description(self) -> str:
-    #     return get_node_types_docstrings(self.node_types)
-
-    # @computed_field
-    # @property
-    # def n_llm_nodes_constraint_string(self) -> str:
-    #     if self.random_n_llm_nodes:
-    #             return f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, self.max_llm_nodes)} exactly."
-    #     return f"Be careful : Do not exceed {self.max_llm_nodes} LLM nodes in the graph."
-
-    # def __init__(self, **data):
-    #     super().__init__(**data)
-    #     self._compute_derived_fields()
-
-    # def _compute_derived_fields(self):
-    #     """Helper method to compute the fields."""
-    #     self.node_types_description = get_node_types_docstrings(self.node_types)
-    #     if self.random_n_llm_nodes:
-    #         self.n_llm_nodes_constraint_string = f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, self.max_llm_nodes)} exactly."
-    #     else:
-    #         self.n_llm_nodes_constraint_string = f"Be careful : Do not exceed {self.max_llm_nodes} LLM nodes in the graph."
-
 
 class AgentOutput(Graph):
     pass
@@ -138,17 +111,16 @@ entire graph with the prompts under the following format:\n
 
 def init_architect_agent(
     model_endpoint_id: str | None,
-    add_format_node: bool = True,  # noqa: FBT001, FBT002
-) -> "Agent":
-    from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
-    from ebiose.core.agent import Agent
+    **kwargs: bool | str | int,
+) -> Agent:
+    add_format_node = kwargs.get("add_format_node", True)
 
-    graph_outline_generation_node = LLMNode(
+    graph_outline_generation_node = LangGraphLLMNode(
         id="graph_outline_generation",
         name="Graph Outline Generation",
         purpose="Step 1: Generate the outline of the graph",
         prompt=GRAPH_OUTLINE_GENERATION_PROMPT,
-        temperature=0.7,  # type: ignore[call-arg]
+        temperature=0.7,
     )
 
     prompt_generation_prompt = PROMPT_GENERATION_PROMPT
@@ -157,22 +129,23 @@ def init_architect_agent(
     else:
         prompt_generation_prompt += "Generate the prompts and return the whole graph with prompts under the following format: \n {output_schema}"
 
-    prompt_generation_node = LLMNode(
+    prompt_generation_node = LangGraphLLMNode(
         id="prompt_generation",
         name="Prompt Generation",
         purpose="Step 2: Generate the prompts for each LLM node",
         prompt=prompt_generation_prompt,
-        temperature=0.7,  # type: ignore[call-arg]
+        temperature=0.7,
     )
 
+    format_node: LangGraphLLMNode | None = None
     if add_format_node:
-        format_node = LLMNode(
+        format_node = LangGraphLLMNode(
             id="format",
             name="Format",
             purpose="Step 3: Format the entire graph with the prompts",
             prompt=FORMAT_PROMPT,
-            temperature=0.0,  # type: ignore[call-arg]
-            tools=[AgentOutput],  # type: ignore[call-arg]
+            temperature=0.0,
+            tools=[AgentOutput],
         )
 
     start_node = StartNode()
@@ -184,7 +157,7 @@ def init_architect_agent(
     graph.add_node(graph_outline_generation_node)
     graph.add_node(prompt_generation_node)
     graph.add_node(end_node)
-    if add_format_node:
+    if add_format_node and format_node is not None:
         graph.add_node(format_node)
 
     graph.add_edge(
@@ -198,7 +171,7 @@ def init_architect_agent(
         ),
     )
 
-    if not add_format_node:
+    if not add_format_node or format_node is None:
         graph.add_edge(
             Edge(start_node_id=prompt_generation_node.id, end_node_id=end_node.id),
         )

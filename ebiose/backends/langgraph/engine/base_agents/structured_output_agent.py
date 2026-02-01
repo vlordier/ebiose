@@ -5,21 +5,23 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, cast
 
-from langchain_core.messages import AnyMessage
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from ebiose.core.agent import Agent
-
+from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
+from ebiose.backends.langgraph.engine.llm_node import LangGraphLLMNode
 from ebiose.backends.langgraph.engine.pydantic_validator_node import (
     LangGraphPydanticValidatorNode,
 )
+from ebiose.core.agent import Agent
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
+
+if TYPE_CHECKING:
+    from langchain_core.messages import AnyMessage
 
 SHARED_CONTEXT_PROMPT = """You are part of a graph agent which goal is to format the following message
 into a given structured output.
@@ -31,28 +33,27 @@ The message is:
 def init_structured_output_agent(
     output_model: type[BaseModel],
     model_endpoint_id: str,
-) -> "Agent":
+) -> Agent:
     # Type checking: ensure output_model is actually a class
     if not isinstance(output_model, type):
-        raise TypeError("output_model must be a class")
-    from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
-    from ebiose.core.agent import Agent
+        msg = "output_model must be a class"
+        raise TypeError(msg)
 
     class AgentInput(BaseModel):
         last_message: AnyMessage | None = None
 
     # Create AgentOutput class dynamically to avoid mypy confusion
-    AgentOutput = type("AgentOutput", (output_model,), {})
+    agent_output_class = type("AgentOutput", (output_model,), {})
 
     shared_context_prompt = SHARED_CONTEXT_PROMPT
 
-    llm_formatter_node = LLMNode(
+    llm_formatter_node = LangGraphLLMNode(
         id="llm_with_structured_output",
         name="llm_with_structured_output",
         purpose="This node uses an LLM to format an input into a given structured output",
         prompt="Format the input into a structured output following the schema given as a tool.",
-        tools=[output_model],  # type: ignore[call-arg]
-        temperature=0.0,  # type: ignore[call-arg]
+        tools=[output_model],
+        temperature=0.0,
     )
 
     pydantic_validator_node = LangGraphPydanticValidatorNode(
@@ -101,7 +102,7 @@ def init_structured_output_agent(
         graph=graph,
         model_endpoint_id=model_endpoint_id,
         input_model=AgentInput,
-        output_model=AgentOutput,
+        output_model=agent_output_class,
         tags=["structured_output_agent"],
     )
 

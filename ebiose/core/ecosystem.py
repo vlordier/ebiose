@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, ClassVar
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
-from sortedcontainers import SortedList  # type: ignore[import-untyped]
+from sortedcontainers import SortedList
 
 from ebiose.core.engines.graph_engine.utils import GraphUtils
 from ebiose.core.model_endpoint import ModelEndpoints
@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
 class Ecosystem(BaseModel):
     id: str = Field(default_factory=lambda: f"forge-cycle-{uuid4()!s}")
-    initial_architect_agents: list["Agent"] | None = None
-    initial_genetic_operator_agents: list["Agent"] | None = None
-    agents: dict[str, "Agent"] = {}
+    initial_architect_agents: list[Agent] | None = None
+    initial_genetic_operator_agents: list[Agent] | None = None
+    agents: dict[str, Agent] = Field(default_factory=dict)
     forge_list: ClassVar[list[AgentForge]] = []
     agent_forge_distances: ClassVar[dict[str, SortedList]] = {}
     model_endpoint_ids: ClassVar[list[str]] = []
@@ -48,10 +48,13 @@ class Ecosystem(BaseModel):
         # TODO(xabier): fix this import to avoid circular dependency
 
         cls.model_rebuild()
+        agents_dict = {
+            agent.id: agent for agent in (initial_agents or [])
+        }
         return cls(
             initial_architect_agents=initial_architect_agents,
             initial_genetic_operator_agents=initial_genetic_operator_agents,
-            agents=initial_agents if initial_agents is not None else [],
+            agents=agents_dict,
         )
 
     def get_agent(self, agent_id: str) -> Agent | None:
@@ -85,8 +88,8 @@ class Ecosystem(BaseModel):
                 (
                     agent,
                     embedding_distance(
-                        agent.description_embedding,
-                        forge.description_embedding,
+                        agent.description_embedding or [],
+                        forge.description_embedding or [],
                     ),
                 )
                 for agent in self.agents.values()
@@ -97,8 +100,8 @@ class Ecosystem(BaseModel):
     def _add_new_born_agent(self, new_agent: Agent) -> None:
         for forge in self.forge_list:
             distance = embedding_distance(
-                new_agent.description_embedding,
-                forge.description_embedding,
+                new_agent.description_embedding or [],
+                forge.description_embedding or [],
             )
             self.agent_forge_distances[forge.id].add((new_agent, distance))
 

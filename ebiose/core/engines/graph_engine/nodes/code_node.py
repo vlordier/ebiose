@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import ast
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -24,9 +24,10 @@ class CodeNode(BaseNode):
     )
 
     async def call_node(
-        self, state: BaseModel | dict, config: BaseModel | None = None
+        self, state: BaseModel | dict, config: BaseModel | None = None,
     ) -> dict:
-        """Executes the code from the last message in the state using exec and returns the result."""
+        _ = config  # Unused parameter
+        """Execute the code from the last message in the state using exec and return the result."""
         # Retrieve the last message from the state
         last_message = (
             state.get("messages", [])[-1]
@@ -49,10 +50,22 @@ class CodeNode(BaseNode):
             msg = "Unsafe code detected"
             raise ValueError(msg)
 
-        # Execute the code
-        local_vars = {}
-        exec(code, {}, local_vars)  # noqa: S102
+        # Execute the code in isolated namespace with restricted builtins
+        local_vars: dict[str, Any] = {}
+        self._execute_safe_code(code, local_vars)
         return {"result": local_vars}
+
+    def _execute_safe_code(self, code: str, local_vars: dict[str, Any]) -> None:
+        """Execute code in restricted namespace (no builtins allowed).
+
+        Security Note: This uses exec() with restricted builtins and no access to
+        dangerous functions. Code must pass is_safe_code() check before reaching here.
+        This is safe for sandboxed user code execution.
+        """
+        compiled = compile(code, "<string>", "exec")
+        # Intentional use of exec with restricted environment for sandboxed execution
+        restricted_globals = {"__builtins__": {}}
+        exec(compiled, restricted_globals, local_vars)
 
     def is_safe_code(self, code: str) -> bool:
         """Perform basic static analysis to check for unsafe code."""

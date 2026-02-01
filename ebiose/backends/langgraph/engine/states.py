@@ -6,12 +6,15 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field, computed_field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from langchain_core.messages import AnyMessage
 
 
 class LangGraphEngineInputState(BaseModel):
@@ -26,7 +29,6 @@ class LangGraphEngineOutputState(BaseModel):
     output: BaseModel | None = Field(default=None)
 
     @computed_field
-    @property
     def n_messages(self) -> int:
         return len(self.messages)
 

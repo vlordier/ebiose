@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 class LLMAPIConfig(BaseModel):
     request_timeout_in_minutes: float = 2.0
     max_retries: int = 1
+    model_name: str | None = None
+    temperature: float = 0.0
+    max_tokens: int = 4096
 
 
 class LLMApi(ABC):
@@ -38,7 +41,7 @@ class LLMApi(ABC):
         lite_llm_api_key: str | None = None,
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
-    ) -> LLMApi:
+    ) -> type[LLMApi]:
         cls.mode = mode
         cls.lite_llm_api_key = lite_llm_api_key
 
@@ -70,7 +73,7 @@ class LLMApi(ABC):
         """Override to add cloud mode support."""
         if cls.mode == "cloud" and forge_cycle_id is not None:
             # If in cloud mode, get the total cost from the API
-            return EbioseAPIClient.get_cost(forge_cycle_uuid=forge_cycle_id)
+            return float(EbioseAPIClient.get_cost(forge_cycle_uuid=forge_cycle_id))
         return cls.total_cost
 
     @classmethod
@@ -80,16 +83,17 @@ class LLMApi(ABC):
 
     @classmethod
     @abstractmethod
-    async def process_llm_call(
-        cls,
-        model_endpoint_id: str,
-        messages: list[AnyMessage],
-        agent_id: str,
-        temperature: float = 0.0,
-        max_tokens: int = 4096,
-        tools: list | None = None,
-    ) -> AnyMessage:
-        """Process an LLM call with backend-specific implementation."""
+    async def process_llm_call(cls, config: object) -> AnyMessage:
+        """Process an LLM call with backend-specific implementation.
+
+        Args:
+            config: Configuration object containing LLM call parameters
+                   (type depends on backend implementation)
+
+        Returns:
+            The LLM response message
+
+        """
 
     @classmethod
     def add_agent_cost(cls, agent_id: str, cost: float) -> None:

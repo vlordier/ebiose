@@ -5,6 +5,7 @@ without hardcoded values.
 
 import sys
 from pathlib import Path
+from typing import Literal, TypedDict
 
 # Add the ebiose package to the path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -101,7 +102,11 @@ def test_no_hardcoded_urls() -> None:
     old_hardcoded_url = "https://ebiose-litellm.livelysmoke-ef8b125f.francecentral.azurecontainerapps.io/"
 
     # Test various initialization scenarios
-    test_cases = [
+    class TestCase(TypedDict):
+        mode: Literal["local", "cloud"]
+        lite_llm_api_base: str | None
+
+    test_cases: list[TestCase] = [
         {"mode": "cloud", "lite_llm_api_base": None},
         {"mode": "cloud", "lite_llm_api_base": ""},  # here we can add custom url
         {"mode": "local", "lite_llm_api_base": None},
@@ -151,7 +156,7 @@ def main() -> None:
         print("- Local mode attempts to use configuration from model_endpoints.yml")
         print("- No more hardcoded URLs")
 
-    except Exception as e:
+    except (AssertionError, ValueError, TypeError) as e:
         print(f"\n❌ Test failed: {e}")
         sys.exit(1)
 

@@ -18,6 +18,7 @@ class BaseNode(BaseModel):
     Attributes:
         id: The identifier of the node
         type: The type of the node
+
     """
 
     id: str
@@ -30,7 +31,7 @@ class BaseNode(BaseModel):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
-        pass
+        return {}
 
 
 class StartNode(BaseNode):
@@ -43,6 +44,7 @@ class StartNode(BaseNode):
     Attributes:
     id: The identifier of the node
     type: The type of the node which is StartNode
+
     """
 
     id: str = Field(default="start_node")
@@ -54,7 +56,8 @@ class StartNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
-        pass
+        _ = state, config  # Unused parameters
+        return {}
 
 
 class EndNode(BaseNode):
@@ -80,4 +83,5 @@ class EndNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
-        pass
+        _ = state, config  # Unused parameters
+        return {}

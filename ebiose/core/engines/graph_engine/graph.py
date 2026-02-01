@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from typing import Any, Literal, LiteralString, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, LiteralString, Self, cast
 
 from pydantic import (
     BaseModel,
@@ -18,9 +18,11 @@ from pydantic import (
     model_validator,
 )
 
-from ebiose.core.engines.graph_engine.edge import Edge
-from ebiose.core.engines.graph_engine.nodes import NodeTypes, node_types_map
+from ebiose.core.engines.graph_engine.nodes import node_types_map
 from ebiose.core.engines.graph_engine.nodes.node import BaseNode, EndNode
+
+if TYPE_CHECKING:
+    from ebiose.core.engines.graph_engine.edge import Edge
 
 
 class Graph(BaseModel):
@@ -133,7 +135,7 @@ class Graph(BaseModel):
 
     @field_validator("nodes", mode="before")
     @classmethod
-    def validate_nodes(cls, nodes: Any) -> list[BaseNode]:
+    def validate_nodes(cls, nodes: list[dict[str, Any]] | list[BaseNode]) -> list[BaseNode]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
         if not isinstance(nodes, list):
             msg = "Field 'nodes' should be a list"
@@ -154,7 +156,7 @@ class Graph(BaseModel):
 
     @field_validator("edges", mode="before")
     @classmethod
-    def validate_edges(cls, edges: Any) -> list[Edge]:
+    def validate_edges(cls, edges: list[dict[str, Any]] | list[Edge]) -> list[Edge]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
         if not isinstance(edges, list):
             msg = "Field 'edges' should be a list"
@@ -164,10 +166,10 @@ class Graph(BaseModel):
             msg = "Field 'edges' cannot be empty."
             raise ValueError(msg)
 
-        return edges
+        return cast("list[Edge]", edges)
 
     @classmethod
-    def __validate_nodes(cls, nodes: list[dict]) -> tuple[list, list]:
+    def __validate_nodes(cls, nodes: list[Any]) -> tuple[list, list]:
         validated_nodes = []
         errors = []
 
@@ -220,7 +222,7 @@ class Graph(BaseModel):
                 continue
 
             try:
-                node_class = cast(type[BaseModel], node_types_map[node_type])
+                node_class = cast("type[BaseModel]", node_types_map[node_type])
                 validated_nodes.append(
                     node_class.model_validate(node),
                 )
@@ -236,6 +238,7 @@ class Graph(BaseModel):
 
         Args:
                 edge: An instance of the Edge class
+
         """
         self.edges.append(edge)
 
@@ -244,6 +247,7 @@ class Graph(BaseModel):
 
         Args:
                 node: An instance of the Node class
+
         """
         # TODO(xabier): Improve performance
         # https://github.com/ebiose-ai/ebiose/issues/43
@@ -260,6 +264,7 @@ class Graph(BaseModel):
 
         Returns:
                 The node with the given id
+
         """
         # TODO(xabeir): Improve performance
         # https://github.com/ebiose-ai/ebiose/issues/43
@@ -274,6 +279,7 @@ class Graph(BaseModel):
 
         Returns:
                 A list of ids of the nodes that have the EndNode as outgoing edges
+
         """
         return [
             edge.start_node_id
@@ -284,6 +290,7 @@ class Graph(BaseModel):
     def get_outgoing_nodes(
         self: Self,
         node_id: str,
+        *,
         conditional: bool | None = None,
     ) -> list[BaseNode]:
         """Get the outgoing nodes of a node. By default, return all nodes connected to the node.
@@ -294,6 +301,7 @@ class Graph(BaseModel):
 
         Returns:
                 A list of nodes that are connected to the node
+
         """
         if conditional is None:
             return [
@@ -328,6 +336,7 @@ class Graph(BaseModel):
     def get_outgoing_edges(
         self: Self,
         node_id: str,
+        *,
         conditional: bool | None = None,
     ) -> list[Edge]:
         """Get the outgoing edges of a node. By default, return all edges connected to the node.
@@ -369,6 +378,7 @@ class Graph(BaseModel):
 
         Args:
                                 orientation: The orientation of the graph.
+
         """
         node_type_display_name = {
             "LLMNode": "({node_name})",

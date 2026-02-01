@@ -1,135 +1,118 @@
-# Type System Extensions for Advanced Type Safety
-from typing import Any, TypeVar, Union, get_origin, get_args, overload, Literal
-from abc import ABC, abstractmethod
+"""Lightweight type utilities used across the project."""
 
-T = TypeVar("T")
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from hashlib import sha256
+from types import UnionType
+from typing import ClassVar, TypeGuard, Union, get_args, get_origin
+
+type JsonSchema = Mapping[str, object]
+type TypeKey = str
+
+
+def _is_type(value: object) -> TypeGuard[type[object]]:
+    return isinstance(value, type)
 
 
 class TypeSafeUnion:
-    """Advanced union type handling utilities."""
+    """Utilities for union type inspection."""
 
     @staticmethod
-    def safe_getattr(obj: Any, attr: str, default: T | None = None) -> Any:
-        """Safely get attribute with type preservation."""
-        try:
-            return getattr(obj, attr, default)
-        except AttributeError:
-            return default
+    def safe_getattr(obj: object, attr: str, default: object | None = None) -> object | None:
+        return getattr(obj, attr, default)
 
     @staticmethod
-    def is_union_type(obj_type: Any) -> bool:
-        """Check if a type is a Union."""
-        return get_origin(obj_type) is Union
+    def is_union_type(obj_type: object) -> bool:
+        origin = get_origin(obj_type)
+        return origin is UnionType or origin is Union
 
     @staticmethod
-    def get_union_args(union_type: Any) -> tuple[Any, ...]:
-        """Get the arguments of a Union type."""
+    def get_union_args(union_type: object) -> tuple[object, ...]:
         return get_args(union_type)
 
 
 class DiscriminatedUnion:
-    """Type-safe discriminated unions."""
+    """Simple discriminated union matching by runtime type."""
 
     @staticmethod
-    def match(value: Any, union_type: Any) -> tuple[str, Any]:
-        """Pattern match on discriminated union."""
+    def match(value: object, union_type: object) -> tuple[str, object]:
         if not TypeSafeUnion.is_union_type(union_type):
             return ("single", value)
 
         for arg in TypeSafeUnion.get_union_args(union_type):
-            if isinstance(value, arg):
+            if _is_type(arg) and isinstance(value, arg):
                 return (arg.__name__, value)
 
         return ("unknown", value)
 
 
 class TypeRegistry:
-    """Advanced type registry for complex relationships."""
+    """Small cache for types derived from JSON schemas."""
 
-    _type_cache: dict[str, Any] = {}
-    _forward_refs: dict[str, Any] = {}
+    _type_cache: ClassVar[dict[TypeKey, type[object]]] = {}
 
     @classmethod
-    def get_or_create_type(cls, schema: dict[str, Any]) -> Any:
-        """Get or create a type from schema with advanced caching."""
+    def get_or_create_type(cls, schema: JsonSchema) -> type[object]:
         type_key = cls._generate_type_key(schema)
         if type_key in cls._type_cache:
             return cls._type_cache[type_key]
 
-        # Advanced type creation logic
-        created_type = cls._create_type_advanced(schema)
+        created_type = cls._create_type(schema)
         cls._type_cache[type_key] = created_type
         return created_type
 
-    @classmethod
-    def _generate_type_key(cls, schema: dict[str, Any]) -> str:
-        """Generate a unique key for schema caching."""
-        import hashlib
-        import json
-
-        schema_str = json.dumps(schema, sort_keys=True, default=str)
-        return hashlib.md5(schema_str.encode()).hexdigest()
-
-    @classmethod
-    def _create_type_advanced(cls, schema: dict[str, Any]) -> Any:
-        """Create a type from schema with advanced logic."""
-        # Placeholder for advanced type creation
-        # This would implement the complex logic from the plan
-        return Any  # Simplified for now
-
-
-class TypeInferenceEngine:
-    """Advanced type inference utilities."""
+    @staticmethod
+    def _generate_type_key(schema: JsonSchema) -> TypeKey:
+        schema_str = json.dumps(dict(schema), sort_keys=True, default=str)
+        return sha256(schema_str.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def infer_return_type(func: Any, args: tuple, kwargs: dict) -> Any:
-        """Infer return type from function signature and arguments."""
-        # Placeholder for advanced type inference
-        return Any
-
-    @staticmethod
-    def resolve_forward_refs(
-        type_hint: Any, global_ns: dict[str, Any], local_ns: dict[str, Any]
-    ) -> Any:
-        """Resolve forward references in complex type expressions."""
-        if isinstance(type_hint, str):
-            try:
-                return eval(type_hint, global_ns, local_ns)
-            except NameError:
-                return Any
-        return type_hint
+    def _create_type(schema: JsonSchema) -> type[object]:
+        schema_type = schema.get("type")
+        type_map: dict[object, type[object]] = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "null": type(None),
+            "array": list,
+            "object": dict,
+        }
+        return type_map.get(schema_type, object)
 
 
-# Type-safe serialization framework
 class TypeSafeSerializer:
-    """Type-safe serialization with generic support."""
+    """Serialize and deserialize data with light type awareness."""
 
     @staticmethod
-    def serialize(obj: Any) -> dict[str, Any]:
-        """Type-safe object serialization."""
-        if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
-            return obj.model_dump()  # type: ignore[attr-defined]
-        elif hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
-            return obj.to_dict()  # type: ignore[attr-defined]
-        elif isinstance(obj, dict):
+    def serialize(obj: object) -> dict[str, object]:
+        if hasattr(obj, "model_dump") and callable(obj.model_dump):
+            result = obj.model_dump()
+            if isinstance(result, Mapping):
+                return dict(result)
+        if hasattr(obj, "to_dict") and callable(obj.to_dict):
+            result = obj.to_dict()
+            if isinstance(result, Mapping):
+                return dict(result)
+        if isinstance(obj, Mapping):
             return dict(obj)
-        else:
-            # Fallback serialization
-            return {"_type": type(obj).__name__, "_value": str(obj)}
+        return {"_type": type(obj).__name__, "_value": str(obj)}
 
     @staticmethod
-    def deserialize(data: dict[str, Any], target_type: type[Any]) -> Any:
-        """Type-safe object deserialization."""
+    def deserialize(data: Mapping[str, object], target_type: type[object]) -> object | None:
+        if hasattr(target_type, "model_validate") and callable(
+            target_type.model_validate,
+        ):
+            validated: object = target_type.model_validate(data)
+            return validated
+        if hasattr(target_type, "from_dict") and callable(
+            target_type.from_dict,
+        ):
+            parsed: object = target_type.from_dict(data)
+            return parsed
         try:
-            if hasattr(target_type, "model_validate") and callable(
-                getattr(target_type, "model_validate")
-            ):
-                return target_type.model_validate(data)  # type: ignore[attr-defined]
-            elif hasattr(target_type, "from_dict") and callable(
-                getattr(target_type, "from_dict")
-            ):
-                return target_type.from_dict(data)  # type: ignore[attr-defined]
-            else:
-                return target_type(**data)
-        except Exception:
+            return target_type(**dict(data))
+        except (TypeError, ValueError):
             return None

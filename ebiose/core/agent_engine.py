@@ -5,14 +5,20 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
-from typing import Any
 
+import json
 import traceback
 from abc import abstractmethod
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from langfuse import observe
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
+
+F = TypeVar("F", bound=Callable[..., Any])
+_ObserveDecorator = Callable[..., Callable[[F], F]]
+_observe_typed = cast("_ObserveDecorator", observe)
 
 
 class AgentEngineRunError(Exception):
@@ -44,9 +50,15 @@ class AgentEngineRunError(Exception):
 
 
 class AgentEngine(BaseModel):
+    """Base class for all agent engines."""
+
     engine_type: str
     agent_id: str | None = None
     configuration: dict | None = None
+    input_model: type[BaseModel] | None = None
+    output_model: type[BaseModel] | None = None
+    model_endpoint_id: str | None = None
+    tags: list[str] | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -59,7 +71,8 @@ class AgentEngine(BaseModel):
         master_agent_id: str,
         forge_cycle_id: str | None = None,
         **kwargs: dict[str, Any],
-    ) -> Any:
+    ) -> BaseModel:
+        """Run the agent engine with the given input."""
         try:
             return await self._run_implementation(
                 agent_input,
@@ -74,7 +87,11 @@ class AgentEngine(BaseModel):
                 agent_identifier=self.agent_id,
             ) from e
 
-    @observe(name="run_agent_engine")
+    def serialize_configuration(self) -> str:
+        """Serialize engine configuration as JSON string."""
+        return json.dumps(self.configuration or {})
+
+    @_observe_typed(name="run_agent_engine")
     @abstractmethod
     async def _run_implementation(
         self,
@@ -82,5 +99,5 @@ class AgentEngine(BaseModel):
         master_agent_id: str,
         forge_cycle_id: str | None = None,
         **kwargs: dict[str, Any],
-    ) -> Any:
-        pass
+    ) -> BaseModel:
+        """Run the agent engine."""

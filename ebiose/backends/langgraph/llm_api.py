@@ -7,133 +7,99 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import traceback
-from typing import TYPE_CHECKING, Literal
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langchain_community.chat_models import ChatLiteLLM
-from langchain_community.chat_models.azureml_endpoint import (
-    AzureMLChatOnlineEndpoint,
-    AzureMLEndpointApiType,
-    CustomOpenAIChatContentFormatter,
-)
+
+try:
+    from langchain_community.chat_models.azureml_endpoint import (
+        AzureMLChatOnlineEndpoint,
+        AzureMLEndpointApiType,
+        CustomOpenAIChatContentFormatter,
+    )
+except ImportError:
+    AzureMLChatOnlineEndpoint = None
+    AzureMLEndpointApiType = None
+    CustomOpenAIChatContentFormatter = None
+
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from litellm.cost_calculator import cost_per_token
 from loguru import logger
 from openai import RateLimitError
 
 from ebiose.core.llm_api import LLMApi, LLMAPIConfig
-from ebiose.core.model_endpoint import ModelEndpoints
+from ebiose.core.model_endpoint import ModelEndpoint, ModelEndpoints
+
+# Optional provider imports - wrap in try/except for graceful degradation
+try:
+    from langchain_anthropic import ChatAnthropic
+except ImportError:
+    ChatAnthropic = None
+
+try:
+    from langchain_huggingface import HuggingFaceEndpoint
+except ImportError:
+    HuggingFaceEndpoint = None
+
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
+
+try:
+    from langchain_ollama import ChatOllama
+except ImportError:
+    ChatOllama = None
 
 if TYPE_CHECKING:
     from langchain_core.messages import AnyMessage
+    from pydantic import SecretStr
 
-    @staticmethod
-    def create_azure_client(
-        model_endpoint_id: str,
-        temperature: float,
-        max_tokens: int | None,
-        request_timeout: float,
-        max_retries: int,
-    ) -> AzureChatOpenAI:
-        """Create Azure client with proper model endpoint validation."""
-        model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
-        if model_endpoint is None:
-            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
-
-        return AzureChatOpenAI(  # type: ignore[call-arg,return-value]
-            azure_endpoint=model_endpoint.endpoint_url.get_secret_value()
-            if model_endpoint.endpoint_url
-            else None,
-            azure_deployment=model_endpoint.deployment_name or "",
-            api_key=model_endpoint.api_key.get_secret_value()
-            if model_endpoint.api_key
-            else None,
-            api_version="2023-12-01-preview",
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=request_timeout,
-            max_retries=max_retries,
-        )
-
-    @staticmethod
-    def create_litellm_client(
-        model_endpoint_id: str,
-        temperature: float,
-        max_tokens: int | None,
-        request_timeout: float,
-        max_retries: int,
-    ) -> ChatLiteLLM:
-        """Create LiteLLM client with proper model endpoint validation."""
-        model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
-        if model_endpoint is None:
-            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
-
-        return ChatLiteLLM(  # type: ignore[call-arg,return-value]
-            model=f"azure/{model_endpoint.deployment_name}",
-            azure_api_key=model_endpoint.api_key.get_secret_value()
-            if model_endpoint.api_key
-            else None,
-            api_base=model_endpoint.endpoint_url.get_secret_value()
-            if model_endpoint.endpoint_url
-            else None,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            request_timeout=request_timeout,
-            max_retries=max_retries,
-        )
+# Type alias for all possible LLM return types
+LLMType = (
+    ChatOpenAI
+    | ChatLiteLLM
+    | AzureChatOpenAI
+    | AzureMLChatOnlineEndpoint
+    | ChatAnthropic
+    | HuggingFaceEndpoint
+    | ChatGoogleGenerativeAI
+    | ChatOllama
+)
 
 
-class AzureProvider(BaseLLMProvider):
-    """Type-safe Azure OpenAI integration."""
+@dataclass
+class LLMCallConfig:
+    """Configuration for LLM calls to reduce parameter count."""
 
-    def create_client(self, config: LLMAPIConfig) -> AzureChatOpenAI:
-        """Create Azure client with proper typing."""
-        model_endpoint = ModelEndpoints.get_model_endpoint(config.model_name)
-        if model_endpoint is None:
-            raise ValueError(f"Model endpoint '{config.model_name}' not found")
-
-        return AzureChatOpenAI(  # type: ignore[call-arg,return-value]
-            azure_endpoint=model_endpoint.endpoint_url.get_secret_value()
-            if model_endpoint.endpoint_url
-            else None,
-            azure_deployment=model_endpoint.deployment_name or "",
-            api_key=model_endpoint.api_key.get_secret_value()
-            if model_endpoint.api_key
-            else None,
-            api_version="2023-12-01-preview",
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
+    model_endpoint_id: str
+    messages: list
+    agent_id: str
+    temperature: float = 0.0
+    max_tokens: int = 4096
+    tools: list | None = None
 
 
-class LiteLLMProvider(BaseLLMProvider):
-    """Type-safe LiteLLM integration."""
+@dataclass
+class LLMProviderConfig:
+    """Configuration for LLM provider creation."""
 
-    def create_client(self, config: LLMAPIConfig) -> ChatLiteLLM:
-        """Create LiteLLM client with proper typing."""
-        model_endpoint = ModelEndpoints.get_model_endpoint(config.model_name)
-        if model_endpoint is None:
-            raise ValueError(f"Model endpoint '{config.model_name}' not found")
-
-        return ChatLiteLLM(  # type: ignore[call-arg,return-value]
-            model=f"azure/{model_endpoint.deployment_name}",
-            azure_api_key=model_endpoint.api_key.get_secret_value()
-            if model_endpoint.api_key
-            else None,
-            api_base=model_endpoint.endpoint_url.get_secret_value()
-            if model_endpoint.endpoint_url
-            else None,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
+    model_endpoint: ModelEndpoint
+    model_endpoint_id: str
+    temperature: float
+    max_tokens: int
+    request_timeout: int | float
+    max_retries: int
 
 
 # --- Type-Safe Helper Functions ---
-def safe_get_secret_value(secret: Any) -> str | None:
+def safe_get_secret_value(secret: str | SecretStr | None) -> str | None:
     """Safely extract secret value from potentially None SecretStr."""
     if secret is None:
         return None
     if hasattr(secret, "get_secret_value"):
-        return secret.get_secret_value()
+        return cast("str", secret.get_secret_value())
     return str(secret) if secret else None
 
 
@@ -173,7 +139,7 @@ class LangGraphLLMApi(LLMApi):
         lite_llm_api_key: str | None = None,
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
-    ) -> LangGraphLLMApi:
+    ) -> type[LangGraphLLMApi]:
         cls.mode = mode
         cls.lite_llm_api_key = lite_llm_api_key
 
@@ -200,7 +166,7 @@ class LangGraphLLMApi(LLMApi):
         model_endpoint_id: str,
         temperature: float,
         max_tokens: int,
-    ) -> AzureChatOpenAI:
+    ) -> LLMType:
         """Get the LLM model from the model endpoint id.
 
         Args:
@@ -210,6 +176,7 @@ class LangGraphLLMApi(LLMApi):
 
         Returns:
             The LLM model
+
         """
         request_timeout = cls._llm_api_config.request_timeout_in_minutes * 60
         max_retries = cls._llm_api_config.max_retries
@@ -217,123 +184,176 @@ class LangGraphLLMApi(LLMApi):
         model_endpoint = ModelEndpoints.get_model_endpoint(model_endpoint_id)
 
         if model_endpoint is None:
-            raise ValueError(f"Model endpoint '{model_endpoint_id}' not found")
+            msg = f"Model endpoint '{model_endpoint_id}' not found"
+            raise ValueError(msg)
 
+        # Cloud mode handling
         if cls.mode == "cloud":
-            return ChatOpenAI(  # type: ignore[call-arg,return-value]
-                openai_api_key=cls.lite_llm_api_key,
-                openai_api_base=cls.lite_llm_api_base,
-                model=model_endpoint_id,
-                temperature=temperature
-                if model_endpoint_id != "azure/o3-mini"
-                else 1.0,
-                max_tokens=max_tokens,
-            )
+            return cls._create_cloud_llm(model_endpoint_id, temperature, max_tokens)
 
-        if ModelEndpoints.use_lite_llm() and ModelEndpoints.use_lite_llm_proxy():
-            lite_llm_api_key, lite_llm_api_base = ModelEndpoints.get_lite_llm_config()
-            return ChatOpenAI(
-                openai_api_key=lite_llm_api_key,
-                openai_api_base=lite_llm_api_base,
-                model=model_endpoint_id,
-                temperature=temperature
-                if model_endpoint_id != "azure/o3-mini"
-                else 1.0,
-                max_tokens=max_tokens,
-            )
+        # LiteLLM handling
+        if ModelEndpoints.use_lite_llm_proxy():
+            return cls._create_litellm_proxy_llm(model_endpoint_id, temperature, max_tokens)
 
         if ModelEndpoints.use_lite_llm():
-            # if model is compatible with LiteLLM, otherwise, custom implementation
-            # TODO(xabier): check/test
-            return ChatLiteLLM(
-                model=f"azure/{model_endpoint.deployment_name}",
-                azure_api_key=safe_get_secret_value(model_endpoint.api_key),
-                api_base=safe_get_secret_value(model_endpoint.endpoint_url),
-                temperature=temperature,
-                max_tokens=max_tokens,
-                request_timeout=request_timeout,
-                max_retries=max_retries,
-            )
+            return cls._create_litellm_llm(model_endpoint, temperature, max_tokens, request_timeout, max_retries)
 
-        if model_endpoint.provider == "OpenAI":
-            return ChatOpenAI(
+        # Provider-specific handling
+        provider_config = LLMProviderConfig(
+            model_endpoint=model_endpoint,
+            model_endpoint_id=model_endpoint_id,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            request_timeout=request_timeout,
+            max_retries=max_retries,
+        )
+        return cls._create_provider_llm(provider_config)
+
+    @classmethod
+    def _create_cloud_llm(cls, model_endpoint_id: str, temperature: float, max_tokens: int) -> ChatOpenAI:
+        """Create LLM for cloud mode."""
+        return ChatOpenAI(
+            openai_api_key=cls.lite_llm_api_key,
+            openai_api_base=cls.lite_llm_api_base,
+            model=model_endpoint_id,
+            temperature=temperature if model_endpoint_id != "azure/o3-mini" else 1.0,
+            max_tokens=max_tokens,
+        )
+
+    @classmethod
+    def _create_litellm_proxy_llm(cls, model_endpoint_id: str, temperature: float, max_tokens: int) -> ChatOpenAI:
+        """Create LLM for LiteLLM proxy mode."""
+        lite_llm_api_key, lite_llm_api_base = ModelEndpoints.get_lite_llm_config()
+        return ChatOpenAI(
+            openai_api_key=lite_llm_api_key,
+            openai_api_base=lite_llm_api_base,
+            model=model_endpoint_id,
+            temperature=temperature if model_endpoint_id != "azure/o3-mini" else 1.0,
+            max_tokens=max_tokens,
+        )
+
+    @classmethod
+    def _create_litellm_llm(
+        cls,
+        model_endpoint: ModelEndpoint,
+        temperature: float,
+        max_tokens: int,
+        request_timeout: float,
+        max_retries: int,
+    ) -> ChatLiteLLM:
+        """Create LLM using LiteLLM."""
+        return ChatLiteLLM(
+            model=f"azure/{model_endpoint.deployment_name}",
+            azure_api_key=safe_get_secret_value(model_endpoint.api_key),
+            api_base=safe_get_secret_value(model_endpoint.endpoint_url),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            request_timeout=request_timeout,
+            max_retries=max_retries,
+        )
+
+    @classmethod
+    def _create_provider_llm(cls, config: LLMProviderConfig) -> LLMType:
+        """Create LLM based on provider using strategy mapping."""
+        provider = config.model_endpoint.provider
+        model_endpoint = config.model_endpoint
+        model_endpoint_id = config.model_endpoint_id
+        temperature = config.temperature
+        max_tokens = config.max_tokens
+        request_timeout = config.request_timeout
+        max_retries = config.max_retries
+
+        # Define provider-specific creation strategies
+        provider_strategies = {
+            "OpenAI": lambda: ChatOpenAI(
                 model=model_endpoint_id,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                api_key=model_endpoint.api_key.get_secret_value(),
-            )
-
-        if model_endpoint.provider == "OpenRouter":
-            return ChatOpenAI(
-                openai_api_base=model_endpoint.endpoint_url.get_secret_value(),
+                api_key=safe_get_secret_value(model_endpoint.api_key),
+            ),
+            "OpenRouter": lambda: ChatOpenAI(
+                openai_api_base=safe_get_secret_value(model_endpoint.endpoint_url),
                 model=model_endpoint_id,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                api_key=model_endpoint.api_key.get_secret_value(),
-            )
-
-        if model_endpoint.provider == "Azure OpenAI":
-            return AzureChatOpenAI(
+                api_key=safe_get_secret_value(model_endpoint.api_key),
+            ),
+            "AzureOpenAI": lambda: AzureChatOpenAI(
                 azure_deployment=model_endpoint.deployment_name,
-                azure_endpoint=model_endpoint.endpoint_url.get_secret_value(),
-                openai_api_key=model_endpoint.api_key.get_secret_value(),
+                azure_endpoint=safe_get_secret_value(model_endpoint.endpoint_url),
+                openai_api_key=safe_get_secret_value(model_endpoint.api_key),
                 openai_api_version=model_endpoint.api_version,
                 temperature=temperature,
                 request_timeout=request_timeout,
                 max_retries=max_retries,
                 max_tokens=max_tokens,
-            )
-
-        if model_endpoint.provider == "Azure AI":
-            return AzureMLChatOnlineEndpoint(
-                endpoint_url=model_endpoint.endpoint_url.get_secret_value(),
-                endpoint_api_type=AzureMLEndpointApiType.serverless,
-                endpoint_api_key=model_endpoint.api_key.get_secret_value(),
-                content_formatter=CustomOpenAIChatContentFormatter(),
+            ),
+            "Azure AI": lambda: cast("Any", AzureMLChatOnlineEndpoint)(
+                endpoint_url=safe_get_secret_value(model_endpoint.endpoint_url),
+                endpoint_api_type=cast("Any", AzureMLEndpointApiType).serverless,
+                endpoint_api_key=safe_get_secret_value(model_endpoint.api_key),
+                content_formatter=cast("Any", CustomOpenAIChatContentFormatter)(),
                 timeout=request_timeout,
                 max_retries=max_retries,
                 max_tokens=max_tokens,
                 model_kwargs={"temperature": temperature},
-            )
+            ),
+        }
 
-        if model_endpoint.provider == "Anthropic":
-            from langchain_anthropic import ChatAnthropic
+        # Providers requiring optional imports
+        optional_providers = {
+            "Anthropic": (
+                ChatAnthropic,
+                "langchain_anthropic not installed. Install with: pip install langchain-anthropic",
+                lambda: cast("Any", ChatAnthropic)(
+                    model=model_endpoint_id,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    api_key=safe_get_secret_value(model_endpoint.api_key),
+                ),
+            ),
+            "HuggingFace": (
+                HuggingFaceEndpoint,
+                "langchain_huggingface not installed. Install with: pip install langchain-huggingface",
+                lambda: cast("Any", HuggingFaceEndpoint)(
+                    repo_id=model_endpoint_id,
+                    task="text-generation",
+                    max_new_tokens=max_tokens,
+                ),
+            ),
+            "Google": (
+                ChatGoogleGenerativeAI,
+                "langchain_google_genai not installed. Install with: pip install langchain-google-genai",
+                lambda: cast("Any", ChatGoogleGenerativeAI)(
+                    model=model_endpoint_id,
+                    google_api_key=safe_get_secret_value(model_endpoint.api_key),
+                ),
+            ),
+            "Ollama": (
+                ChatOllama,
+                "langchain_ollama not installed. Install with: pip install langchain-ollama",
+                lambda: cast("Any", ChatOllama)(
+                    model=model_endpoint_id.replace("ollama/", ""),
+                    temperature=temperature,
+                    num_predict=max_tokens,
+                    base_url=safe_get_secret_value(model_endpoint.endpoint_url),
+                ),
+            ),
+        }
 
-            return ChatAnthropic(
-                model=model_endpoint_id,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=model_endpoint.api_key.get_secret_value(),
-            )
+        # Try standard providers first
+        if provider in provider_strategies:
+            return provider_strategies[provider]()
 
-        if model_endpoint.provider == "HuggingFace":
-            from langchain_huggingface import HuggingFaceEndpoint
+        # Try optional providers
+        if provider in optional_providers:
+            provider_class, error_msg, factory = optional_providers[provider]
+            if provider_class is None:
+                raise ImportError(error_msg)
+            return factory()
 
-            return HuggingFaceEndpoint(
-                repo_id=model_endpoint_id,
-                task="text-generation",
-                max_new_tokens=max_tokens,
-            )
-
-        if model_endpoint.provider == "Google":
-            from langchain_google_genai import ChatGoogleGenerativeAI
-
-            return ChatGoogleGenerativeAI(
-                model=model_endpoint_id,
-                google_api_key=model_endpoint.api_key.get_secret_value(),
-            )
-
-        if model_endpoint.provider == "Ollama":
-            from langchain_ollama import ChatOllama
-
-            return ChatOllama(
-                model=model_endpoint_id.replace("ollama/", ""),
-                temperature=temperature,
-                num_predict=max_tokens,
-                base_url=model_endpoint.endpoint_url.get_secret_value(),
-            )
-
-        msg = f"Model endpoint {model_endpoint_id} not found"
+        # Unknown provider
+        msg = f"Unsupported provider: {provider}"
         raise ValueError(msg)
 
     @classmethod
@@ -356,44 +376,67 @@ class LangGraphLLMApi(LLMApi):
 
         Returns:
             The LLM's response text
+
         """
         if tools is None:
             tools = []
 
         llm = cls._get_llm(model_endpoint_id, temperature, max_tokens)
 
+        # Ensure llm is not None
+        if llm is None:
+            msg = f"Failed to initialize LLM for model endpoint '{model_endpoint_id}'"
+            raise LangGraphLLMApiError(msg, llm_identifier=model_endpoint_id)
+
         # Add tools
         if tools:
-            llm = llm.bind_tools(tools=tools)
+            # We use cast here because LLMType is a union that technically includes NoneType
+            # due to optional imports, but we've already checked for None above.
+            llm = cast("Any", llm).bind_tools(tools=tools)
 
         # Call LLM
-        return await llm.with_retry(
+        response = await cast("Any", llm).with_retry(
             retry_if_exception_type=(RateLimitError,),  # APITimeoutError
             wait_exponential_jitter=True,
             stop_after_attempt=10,
         ).ainvoke(messages)
+        return cast("AnyMessage", response)
 
     @classmethod
-    async def process_llm_call(
-        cls,
-        model_endpoint_id: str,
-        messages: list[AnyMessage],
-        agent_id: str,
-        temperature: float = 0.0,
-        max_tokens: int = 4096,
-        tools: list | None = None,
-    ) -> AnyMessage:
+    async def process_llm_call(cls, config: object) -> AnyMessage:
+        """Process LLM call with config object.
+
+        Args:
+            config: LLMCallConfig containing all call parameters
+
+        Returns:
+            The LLM response message
+
+        """
+        if not isinstance(config, LLMCallConfig):
+            msg = f"Expected LLMCallConfig, got {type(config)}"
+            raise TypeError(msg)
+
+        def _check_response(resp: AnyMessage | None, endpoint_id: str) -> None:
+            if resp is None:
+                msg = "Empty response from LLM"
+                raise LangGraphLLMApiError(
+                    msg,
+                    RuntimeError("Empty response"),
+                    endpoint_id,
+                )
+
         try:
             # Record the request and tokens
             response = await cls._call_llm(
-                model_endpoint_id,
-                messages,
-                temperature,
-                max_tokens,
-                tools,
+                config.model_endpoint_id,
+                config.messages,
+                config.temperature,
+                config.max_tokens,
+                config.tools or None,
             )
-            if response is None:
-                return None
+
+            _check_response(response, config.model_endpoint_id)
 
             completion_tokens = response.response_metadata["token_usage"].get(
                 "completion_tokens",
@@ -405,17 +448,17 @@ class LangGraphLLMApi(LLMApi):
             )
 
             cost_tuple = cost_per_token(
-                model=model_endpoint_id,
+                model=config.model_endpoint_id,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
             )
 
             cost = sum(cost_tuple)
-            cls.add_agent_cost(agent_id, cost)
+            cls.add_agent_cost(config.agent_id, cost)
 
         except Exception as e:
-            logger.debug(f"Error when calling {model_endpoint_id}: {e!s}")
+            logger.debug(f"Error when calling {config.model_endpoint_id}: {e!s}")
             msg = "Failed during call to an LLM API"
-            raise LangGraphLLMApiError(msg, e, model_endpoint_id) from e
+            raise LangGraphLLMApiError(msg, e, config.model_endpoint_id) from e
         else:
             return response

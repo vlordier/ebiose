@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import ast
 import uuid
-from typing import Literal, cast, Dict, Any
+from typing import Literal
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
-from langgraph.runtime import Runtime
 from pydantic import BaseModel, Field
 
 from ebiose.backends.langgraph.engine.states import (
@@ -102,11 +101,19 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
             for tool_content in tool_contents:
                 tool_content_args.update(tool_content["args"])
 
+            # Validate before entering try block
+            if output_model is None or not hasattr(output_model, "model_validate"):
+                msg = "Output model not properly configured"
+                return {
+                    "messages": self.get_messages("failure", error=ValueError(msg)),
+                    "output": None,
+                    "error_message": msg,
+                    "condition": "failure",
+                }
+
             try:
-                if output_model is None or not hasattr(output_model, "model_validate"):
-                    raise ValueError("Output model not properly configured")
                 output = output_model.model_validate(tool_content_args)
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError) as e:
                 return {
                     "messages": self.get_messages("failure", error=e),
                     "output": None,
@@ -120,7 +127,7 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
                 "condition": "success",
             }
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
             # TODO(xabier): send a different condition (eg validation_error vs other_error)
             return {
                 "messages": self.get_messages("failure", error=e),

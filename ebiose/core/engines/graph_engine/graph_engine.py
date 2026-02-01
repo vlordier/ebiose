@@ -5,9 +5,9 @@ This software is licensed under the MIT License. See LICENSE for details.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import json
+from typing import TYPE_CHECKING, Any
 
 from pydantic import (
     BaseModel,
@@ -17,8 +17,10 @@ from pydantic import (
 )
 
 from ebiose.core.agent_engine import AgentEngine
-from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.tools.json_schema_to_pydantic import create_pydantic_model_from_schema
+
+if TYPE_CHECKING:
+    from ebiose.core.engines.graph_engine.graph import Graph
 
 
 class GraphEngine(AgentEngine):
@@ -55,7 +57,7 @@ class GraphEngine(AgentEngine):
     def _validate_input_output_models(
         self,
         model_name: str,
-        io_model: dict | type[BaseModel],
+        io_model: dict[str, Any] | type[BaseModel],
     ) -> type[BaseModel]:
         # validate input_model and output_model
         if isinstance(io_model, dict):
@@ -63,7 +65,7 @@ class GraphEngine(AgentEngine):
                 schema=io_model,
                 model_name=model_name,
             )
-        if issubclass(io_model, BaseModel):
+        if isinstance(io_model, type) and issubclass(io_model, BaseModel):
             return io_model
 
         msg = "input_model and output_model must either be a BaseModel or a Dict"
@@ -79,7 +81,7 @@ class GraphEngine(AgentEngine):
             if field.annotation:
                 try:
                     annotation_name = getattr(
-                        field.annotation, "__name__", str(field.annotation)
+                        field.annotation, "__name__", str(field.annotation),
                     )
                 except AttributeError:
                     annotation_name = str(field.annotation)

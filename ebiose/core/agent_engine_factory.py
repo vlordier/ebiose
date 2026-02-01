@@ -7,9 +7,13 @@ This software is licensed under the MIT License. See LICENSE for details.
 # core/agentEngineFactory.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
-from ebiose.core.agent_engine import AgentEngine
 from ebiose.core.model_endpoint import ModelEndpoints
+
+if TYPE_CHECKING:
+    from ebiose.core.agent_engine import AgentEngine
 
 
 class AgentEngineFactory:
@@ -27,6 +31,9 @@ class AgentEngineFactory:
                 agent_id=agent_id,
                 configuration=configuration,
                 model_endpoint_id=model_endpoint_id,
+                input_model=None,
+                output_model=None,
+                graph=None,
             )
         msg = f"Unknown engine type: {engine_type}"
         raise ValueError(msg)

@@ -31,15 +31,18 @@ dependencies = [
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-exclude = ["./notebooks/", "./ebiose/generated_cloud_sdk/"]
+exclude = ["notebooks", "ebiose/generated_cloud_sdk", "ebiose/stubs", "typing_stubs"]
+
+[tool.pyrefly.errors]
+redundant-condition = "error"
 # ruff handles Python files by default, other files are handled separately
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
   "D107",    # missing docstring in __init__
+  "D203",    # one blank line before class (conflicts with D211)
   "E501",    # line too long
-  "TC001",   # doing typing bloc breaks pydantic
   "FIX002",  # Lines has TODO
   "PT023",   # messes up pytest.mark.costly
   "TD003",   # issue link in a TODO comment
@@ -50,10 +53,8 @@ ignore = [
   "D104",    # Missing docstring in public package
   "D105",    # Missing docstring in magic method
   "D106",    # Missing docstring in nested public class
-  "BLE001",  # Do not catch blind exception: `Exception`
-  "PLR0913", # Too many arguments in function definition (6 > 5)
+  "D213",    # multi-line-summary-second-line (conflicts with D212)
   "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
-  "ERA001",  # commented-out code (too many to fix manually)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -67,11 +68,20 @@ ignore = [
 # Docker and Makefiles - infrastructure files
 "Dockerfile*" = ["E501", "D100", "D101"]
 "Makefile*" = ["E501", "D100", "D101"]
+# Type stubs - third-party library stubs with intentional Any usage
+"typing_stubs/**/*.pyi" = ["ALL"]
+"ebiose/stubs/**/*.pyi" = ["ALL"]
+# Code sandbox execution - intentionally uses exec() with restricted builtins for safe user code execution
+"ebiose/core/engines/graph_engine/nodes/code_node.py" = ["S102"]
+# Test files - allow assert, print, relaxed typing
+"tests/**/*.py" = ["S101", "T201", "ANN", "D"]
+"test_*.py" = ["S101", "T201", "ANN", "D"]
 
 
 [tool.mypy]
 python_version = "3.12"
 python_executable = "python3.12"
+mypy_path = ["typing_stubs"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -86,7 +96,6 @@ warn_unreachable = true
 strict_equality = true
 # Advanced features
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-enable_incomplete_namespace_package = true
 extra_checks = true
 exclude = [
     "notebooks/",
@@ -98,10 +107,6 @@ module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
-[[tool.mypy.overrides]]
-module = "test_*"
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
 
 # Additional linting tools for multi-file support
 [tool.yamllint]
@@ -125,12 +130,22 @@ exclude = ["notebooks/**"]
 [tool.hadolint]
 ignored-codes = ["DL3008", "DL3013", "DL3018"]  # Common acceptable warnings
 
+[tool.pyrefly]
+project-excludes = [
+    "**/notebooks/",
+    "**/ebiose/generated_cloud_sdk/",
+]
+search-path = ["typing_stubs"]
+python-interpreter-path = "/Users/vincent/.pyenv/shims/python3.12"
+python-version = "3.12"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.2",
     "types-aiofiles>=25.1.0.20251011",
     "types-psutil>=7.2.1.20260116",
     "types-pyyaml>=6.0.12.20250915",
@@ -138,3 +153,8 @@ dev = [
     "types-tqdm>=4.67.0.20250809",
     "types-tzlocal>=5.1.0.1",
 ]
+# extra_search_path = ["typing_stubs"]
+# exclude = [
+#     "notebooks/",
+#     "ebiose/generated_cloud_sdk/",
+# ]

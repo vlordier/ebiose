@@ -30,6 +30,7 @@ class Edge(BaseModel):
         edge = Edge(start_node_id="mid", end_node_id="end", condition="valid")
         edge = Edge(start_node_id="mid", end_node_id="fixer", condition="invalid")
         ```
+
     """
 
     start_node_id: str

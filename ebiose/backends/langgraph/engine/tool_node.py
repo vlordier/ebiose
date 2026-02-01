@@ -7,10 +7,9 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langchain_core.messages import ToolMessage
-from langgraph.runtime import Runtime
 from loguru import logger
 from pydantic import BaseModel, Field, computed_field
 
@@ -19,6 +18,9 @@ from ebiose.backends.langgraph.engine.states import (
     LangGraphEngineOutputState,
 )
 from ebiose.core.engines.graph_engine.nodes.node import BaseNode
+
+if TYPE_CHECKING:
+    import builtins
 
 
 class InputState(LangGraphEngineInputState):
@@ -37,12 +39,12 @@ class LangGraphToolNode(BaseNode):
         ...,
         description="el",
     )
-    input_state_model: type[BaseModel] = InputState
-    output_state_model: type[BaseModel] = OutputState
+    input_state_model: builtins.type[BaseModel] = InputState
+    output_state_model: builtins.type[BaseModel] = OutputState
 
     @computed_field
     def tools_by_name(self) -> dict[str, Any]:
-        """Returns a dictionary mapping tool names to their respective Tool objects."""
+        """Return a dictionary mapping tool names to their respective Tool objects."""
         return {tool.name: tool for tool in self.tools}
 
     async def call_node(
@@ -50,8 +52,9 @@ class LangGraphToolNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        _ = config  # Unused parameter
         try:
-            outputs = []
+            outputs: list[ToolMessage] = []
             # Handle both dict and structured state
             if isinstance(state, dict):
                 messages = state.get("messages", [])
@@ -69,11 +72,8 @@ class LangGraphToolNode(BaseNode):
                 ):
                     try:
                         tool_name = str(tool_call["name"])
-                        tools_dict = self.tools_by_name
-                        if callable(tools_dict):
-                            tools_dict = tools_dict()  # Call the computed field
-
-                        if isinstance(tools_dict, dict) and tool_name in tools_dict:
+                        tools_dict = cast("dict[str, Any]", self.tools_by_name)
+                        if tool_name in tools_dict:
                             tool_result = tools_dict[tool_name].invoke(
                                 tool_call["args"],
                             )
@@ -84,14 +84,14 @@ class LangGraphToolNode(BaseNode):
                                     tool_call_id=tool_call.get("id", ""),
                                 ),
                             )
-                    except Exception as e:
+                    except (ValueError, TypeError, RuntimeError, KeyError, AttributeError, ImportError) as e:
                         logger.warning(
-                            f"Failed to invoke tool {tool_call.get('name', 'unknown')}: {e}"
+                            f"Failed to invoke tool {tool_call.get('name', 'unknown')}: {e}",
                         )
                         continue
-            return {"messages": outputs}
-
         except Exception as e:
             logger.debug(f"Error when calling node {self.name}: {e!s}")
             msg = "Failed during call to a tool Node."
-            raise ValueError(msg)
+            raise ValueError(msg) from e
+        else:
+            return {"messages": outputs}

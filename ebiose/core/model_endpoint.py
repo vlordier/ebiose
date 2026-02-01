@@ -26,13 +26,6 @@ class ModelSize(Enum):
 class ModelEndpoint(BaseModel):
     endpoint_id: str
     provider: str
-    # model_name: str  # noqa: ERA001
-
-    # description: str # noqa: ERA001
-    # model_type: ModelType # noqa: ERA001
-    # size: ModelSize # noqa: ERA001
-    # token_per_minute_limit: int # noqa: ERA001
-    # request_per_minute_limit: int # noqa: ERA001
 
     # model endpoint config
     api_key: SecretStr | None = None
@@ -64,7 +57,9 @@ class ModelEndpoints:
     def get_default_model_endpoint_id() -> str:
         if ModelEndpoints._default_agent_endpoint_id is None:
             ModelEndpoints.load_model_endpoints()
-        assert ModelEndpoints._default_agent_endpoint_id is not None
+        if ModelEndpoints._default_agent_endpoint_id is None:
+            msg = "Default agent endpoint ID is not set"
+            raise ValueError(msg)
         return ModelEndpoints._default_agent_endpoint_id
 
     @staticmethod

@@ -3,9 +3,11 @@ import json
 import random
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from ebiose.cloud_client.client import (
     AgentEngineInputModel,
@@ -17,26 +19,36 @@ from ebiose.cloud_client.client import (
     ForgeInputModel,
     LogEntryInputModel,
 )
+from ebiose.core.agent import Agent
+from ebiose.core.agent_engine_factory import AgentEngineFactory
 from ebiose.core.agent_factory import AgentFactory
 from ebiose.core.ecosystem import Ecosystem
+from ebiose.core.engines.graph_engine.edge import Edge
+from ebiose.core.engines.graph_engine.graph import Graph
+from ebiose.core.engines.graph_engine.nodes import EndNode, LLMNode, StartNode
 from ebiose.core.engines.graph_engine.utils import GraphUtils
 from ebiose.core.model_endpoint import ModelEndpoints
 
 if TYPE_CHECKING:
-    from ebiose.core.agent import Agent
     from ebiose.core.forge_cycle import CloudForgeCycleConfig
+
+R = TypeVar("R")  # For generic return types
 
 
 ES_INDEX = "test-pva4"
 
 
-def build_agent_input_model(agent: "Agent", forge_cycle_id: str) -> AgentInputModel:
+def build_agent_input_model(
+    agent: "Agent",
+    forge_cycle_id: str | None,
+) -> AgentInputModel:
     """Format the agent for the API."""
     if agent.agent_engine is None:
-        raise ValueError(f"Agent {agent.id} has no engine")
+        msg = f"Agent {agent.id} has no engine"
+        raise ValueError(msg)
 
     agent_engine = AgentEngineInputModel(
-        engineType=agent.agent_engine.engine_type,
+        engine_type=agent.agent_engine.engine_type,
         configuration=agent.agent_engine.serialize_configuration(),
     )
     # TODO(xabier): make this more straightforward
@@ -50,13 +62,13 @@ def build_agent_input_model(agent: "Agent", forge_cycle_id: str) -> AgentInputMo
     return AgentInputModel(
         name=agent.name,
         description=agent.description,
-        architectAgentUuid=agent.architect_agent_id,
-        geneticOperatorAgentUuid=agent.genetic_operator_agent_id,
-        agentEngine=agent_engine,
-        descriptionEmbedding=agent.description_embedding,
-        agentType=agent_type,
-        parentAgentUuids=agent.parent_ids,
-        originForgeCycleUuid=forge_cycle_id,
+        architect_agent_uuid=agent.architect_agent_id,
+        genetic_operator_agent_uuid=agent.genetic_operator_agent_id,
+        agent_engine=agent_engine,
+        description_embedding=agent.description_embedding,
+        agent_type=agent_type,
+        parent_agent_uuids=agent.parent_ids,
+        origin_forge_cycle_uuid=forge_cycle_id,
     )
 
 
@@ -67,8 +79,12 @@ class EbioseAPIClient:
     def _get_client(cls) -> EbioseCloudClient:
         """Get the API client, initializing it if necessary."""
         if cls._client is None:
+            base_url = ModelEndpoints.get_ebiose_api_base()
+            if base_url is None:
+                msg = "Ebiose API base URL is not configured"
+                raise ValueError(msg)
             cls._client = EbioseCloudClient(
-                base_url=ModelEndpoints.get_ebiose_api_base(),
+                base_url=base_url,
                 api_key=ModelEndpoints.get_ebiose_api_key(),
             )
         return cls._client
@@ -78,11 +94,9 @@ class EbioseAPIClient:
         """Set the API client with the provided API key."""
         cls._get_client()  # Initialize the client
 
-    import re
-
     @staticmethod
     def _to_snake_case(name: str) -> str:
-        """Converts a PascalCase or camelCase string to snake_case."""
+        """Convert a PascalCase or camelCase string to snake_case."""
         # Example: "EcosystemUuid" -> "ecosystem_uuid"
         # Example: "Region" -> "region"
         # This regex finds a lowercase letter or digit followed by an uppercase letter
@@ -93,9 +107,10 @@ class EbioseAPIClient:
         return s2.lower()
 
     @classmethod
-    def _convert_data_keys(cls, data: Any) -> Any:
-        """Recursively traverses a data structure (dict or list) and converts
-        all dictionary keys from PascalCase to snake_case.
+    def _convert_data_keys(cls, data: Any) -> Any:  # noqa: ANN401
+        """Recursively traverse a data structure and convert keys.
+
+        Converts all dictionary keys from PascalCase to snake_case.
         """
         if isinstance(data, list):
             # If it's a list, apply the conversion to each item in the list.
@@ -113,28 +128,25 @@ class EbioseAPIClient:
         return data
 
     # This is the updated decorator within YourClass
+    @staticmethod
     def _handle_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Decorator to handle client initialization, API errors, AND
-        to convert response keys from PascalCase to snake_case.
+        """Wrap function to handle client initialization and API errors.
+
+        Also converts response keys from PascalCase to snake_case.
         """
 
         @functools.wraps(func)
-        def wrapper(cls: type["EbioseAPIClient"], *args: Any, **kwargs: Any) -> Any:
+        def wrapper(
+            cls: type["EbioseAPIClient"],
+            *args: Any,  # noqa: ANN401
+            **kwargs: Any,  # noqa: ANN401
+        ) -> Any:  # noqa: ANN401
             try:
                 if cls._client is None:
                     cls.set_client()
 
-                # logger.debug(f"\nAttempting to {func.__name__.replace('_', ' ')}...")
-
                 # 1. Call the original method to get the raw API response
                 pascal_case_result = func(cls, *args, **kwargs)
-
-                # 2. If the call was successful, convert the keys before returning
-                if pascal_case_result is not None:
-                    return cls._convert_data_keys(pascal_case_result)
-
-                # Return None if the original result was None
-                return None
 
             except EbioseCloudError as e:
                 logger.debug(f"An API error occurred: {e}")
@@ -142,11 +154,18 @@ class EbioseAPIClient:
                     logger.debug(f"Raw error response from server: {e.response_text}")
                 return None
 
-            except Exception as e:
+            except (ValueError, TypeError, KeyError, AttributeError) as e:
                 logger.debug(f"An unexpected error occurred: {e}")
                 return None
+            else:
+                # 2. If the call was successful, convert the keys before returning
+                if pascal_case_result is not None:
+                    return cls._convert_data_keys(pascal_case_result)
 
-        return wrapper
+                # Return None if the original result was None
+                return None
+
+        return cast("Callable[..., Any]", wrapper)
 
     @classmethod
     @_handle_api_errors
@@ -179,7 +198,7 @@ class EbioseAPIClient:
 
     @classmethod
     @_handle_api_errors
-    def get_first_ecosystem_uuid(cls) -> str:
+    def get_first_ecosystem_uuid(cls) -> str | None:
         """Get the first ecosystem UUID."""
         ecosystems = cls.get_ecosystems()
         return ecosystems[0].uuid if ecosystems else None
@@ -206,18 +225,15 @@ class EbioseAPIClient:
         cls,
         agents: list["Agent"],
         ecosystem_id: str,
-    ) -> list[str]:
+    ) -> None:
         """Post agents in an ecosystem."""
         agents_data = [
             build_agent_input_model(agent, forge_cycle_id=None) for agent in agents
         ]
-        response = cls._get_client().add_agents_to_ecosystem(
+        cls._get_client().add_agents_to_ecosystem(
             ecosystem_uuid=ecosystem_id,
             agents_data=agents_data,
         )
-
-        # Return the UUIDs of the added agents
-        return [agent.uuid for agent in response]
 
     @classmethod
     @_handle_api_errors
@@ -231,7 +247,7 @@ class EbioseAPIClient:
             build_agent_input_model(agent, forge_cycle_id=forge_cycle_id)
             for agent in agents
         ]
-        return cls._get_client().add_agents_during_forge_cycle(
+        cls._get_client().add_agents_during_forge_cycle(
             forge_cycle_uuid=forge_cycle_id,
             agents_data=agents_data,
         )
@@ -242,7 +258,7 @@ class EbioseAPIClient:
         cls,
         forge_cycle_id: str,
         agent: "Agent",
-    ) -> None:
+    ) -> str:
         """Post a single agent in a forge cycle."""
         agent_data = build_agent_input_model(agent, forge_cycle_id=forge_cycle_id)
         agent_output_model = cls._get_client().add_agent_during_forge_cycle(
@@ -250,6 +266,9 @@ class EbioseAPIClient:
             data=agent_data,
         )
 
+        if agent_output_model.uuid is None:
+            msg = "Agent UUID missing in forge cycle response"
+            raise ValueError(msg)
         return agent_output_model.uuid
 
     @classmethod
@@ -260,20 +279,18 @@ class EbioseAPIClient:
         # we just need to get architect and genetic operator agents from the API
         # based on the selected agents from the ecosystem.
         response = cls._get_client().get_ecosystem(uuid=ecosystem_id)
-        if response:
-            agents = [
-                AgentFactory.load_agent_from_api(agent_data)
-                for agent_data in response.agents or []
-            ]
-            # TODO(xabier): understand why this import is needed here
-
-            Ecosystem.model_rebuild()
-            return Ecosystem(
-                id=response.uuid,
-                agents={agent.id: agent for agent in agents},
-            )
-        logger.debug(f"No ecosystem found with UUID: {ecosystem_id}")
-        return None
+        agents = [
+            AgentFactory.load_agent_from_api(agent_data)
+            for agent_data in response.agents or []
+        ]
+        Ecosystem.model_rebuild()
+        if response.uuid is None:
+            msg = "Ecosystem UUID missing in response"
+            raise ValueError(msg)
+        return Ecosystem(
+            id=response.uuid,
+            agents={agent.id: agent for agent in agents},
+        )
 
     @classmethod
     @_handle_api_errors
@@ -284,7 +301,7 @@ class EbioseAPIClient:
         return_ids_only: bool,
     ) -> list[str] | list["Agent"] | None:
         response = cls._get_client().list_agents_in_ecosystem(
-            ecosystem_uuid=ecosystem_id
+            ecosystem_uuid=ecosystem_id,
         )
         if return_ids_only:
             return [r.uuid for r in response if r.uuid is not None]
@@ -294,8 +311,8 @@ class EbioseAPIClient:
             try:
                 agent = AgentFactory.load_agent_from_api(r)
                 agents.append(agent)
-            except Exception as e:
-                print(f"Error loading agent from API: {e!s}")
+            except (ValueError, TypeError, KeyError, AttributeError) as e:
+                logger.debug(f"Failed to load agent from API: {e}")
         return agents
 
     @classmethod
@@ -309,7 +326,7 @@ class EbioseAPIClient:
         forge_input_model = ForgeInputModel(
             name=name,
             description=description,
-            ecosystemUuid=ecosystem_id,
+            ecosystem_uuid=ecosystem_id,
         )
         response = cls._get_client().add_forge(
             data=forge_input_model,
@@ -324,6 +341,7 @@ class EbioseAPIClient:
         forge_name: str,
         forge_description: str,
         forge_cycle_config: "CloudForgeCycleConfig",
+        *,
         override_key: bool | None = None,
     ) -> tuple[str, str, str, str]:
         forge_id = cls.add_forge(
@@ -333,12 +351,12 @@ class EbioseAPIClient:
         )
 
         forge_cycle_input = ForgeCycleInputModel(
-            nAgentsInPopulation=forge_cycle_config.n_agents_in_population,
-            nSelectedAgentsFromEcosystem=forge_cycle_config.n_selected_agents_from_ecosystem,
-            nBestAgentsToReturn=forge_cycle_config.n_best_agents_to_return,
-            replacementRatio=forge_cycle_config.replacement_ratio,
-            tournamentSizeRatio=forge_cycle_config.tournament_size_ratio,
-            localResultsPath=None,  # forge_cycle_config.local_results_path, no use to send it to the server side
+            n_agents_in_population=forge_cycle_config.n_agents_in_population,
+            n_selected_agents_from_ecosystem=forge_cycle_config.n_selected_agents_from_ecosystem,
+            n_best_agents_to_return=forge_cycle_config.n_best_agents_to_return,
+            replacement_ratio=forge_cycle_config.replacement_ratio,
+            tournament_size_ratio=forge_cycle_config.tournament_size_ratio,
+            local_results_path=None,  # forge_cycle_config.local_results_path, no use to send it to the server side
             budget=forge_cycle_config.budget,
         )
 
@@ -348,10 +366,18 @@ class EbioseAPIClient:
             override_key=override_key,
         )
 
+        if (
+            new_cycle_output.lite_llm_key is None
+            or new_cycle_output.base_url is None
+            or new_cycle_output.forge_cycle_uuid is None
+        ):
+            msg = "Forge cycle response missing required fields"
+            raise ValueError(msg)
+
         return (
-            new_cycle_output.liteLLMKey,
-            new_cycle_output.baseUrl,
-            new_cycle_output.forgeCycleUuid,
+            new_cycle_output.lite_llm_key,
+            new_cycle_output.base_url,
+            new_cycle_output.forge_cycle_uuid,
             forge_id,
         )
 
@@ -382,10 +408,7 @@ class EbioseAPIClient:
         forge_cycle_spend_output = cls._get_client().get_spend(
             forge_cycle_uuid=forge_cycle_uuid,
         )
-        if forge_cycle_spend_output is None:
-            logger.debug(f"No spend data found for forge cycle {forge_cycle_uuid}")
-            return 0.0
-        return forge_cycle_spend_output.spentBudget
+        return forge_cycle_spend_output.spent_budget
 
     @classmethod
     @_handle_api_errors
@@ -406,10 +429,6 @@ class EbioseAPIClient:
 
 
 def get_sample_agent() -> "Agent":
-    from pydantic import BaseModel, Field
-
-    from ebiose.core.agent import Agent
-
     class AgentInput(BaseModel):
         math_problem: str = Field(
             ...,
@@ -419,7 +438,6 @@ def get_sample_agent() -> "Agent":
     class AgentOutput(BaseModel):
         """The expected final output to the mathematical problem."""
 
-        #   rationale: str = Field(..., description="The rationale for the solution")
         solution: int = Field(..., description="The solution to the problem.")
 
     shared_context_prompt = """
@@ -429,8 +447,6 @@ def get_sample_agent() -> "Agent":
     given by the solver node. If it is incorrect, the verifier node provides insights
     back to the solver node so that it improves the solution.
     """
-
-    from ebiose.core.engines.graph_engine.nodes import LLMNode
 
     solver_prompt = """
     Your are the Solver node. You must solve the given math problem.
@@ -457,13 +473,8 @@ def get_sample_agent() -> "Agent":
         prompt=verifier_prompt,
     )
 
-    from ebiose.core.engines.graph_engine.nodes import EndNode, StartNode
-
     start_node = StartNode()
     end_node = EndNode()
-
-    from ebiose.core.engines.graph_engine.edge import Edge
-    from ebiose.core.engines.graph_engine.graph import Graph
 
     math_graph = Graph(shared_context_prompt=shared_context_prompt)
 
@@ -497,8 +508,6 @@ def get_sample_agent() -> "Agent":
         ),
     )
 
-    from ebiose.core.agent_engine_factory import AgentEngineFactory
-
     math_graph_engine = AgentEngineFactory.create_engine(
         engine_type="langgraph_engine",
         agent_id="agent-" + str(uuid.uuid4()),
@@ -507,8 +516,6 @@ def get_sample_agent() -> "Agent":
             "input_model": AgentInput.model_json_schema(),
             "output_model": AgentOutput.model_json_schema(),
         },
-        # input_model=AgentInput,
-        # output_model=AgentOutput,
         model_endpoint_id="azure/gpt-4o-mini",
     )
 
@@ -519,15 +526,16 @@ def get_sample_agent() -> "Agent":
     crossover_agent = GraphUtils.get_crossover_agent(
         model_endpoint_id="azure/gpt-4o-mini",
     )
-    mutation_agent = GraphUtils.get_mutation_agent(
+    GraphUtils.get_mutation_agent(
         model_endpoint_id="azure/gpt-4o-mini",
     )
 
+    math_agent_id = math_graph_engine.agent_id or "agent-" + str(uuid.uuid4())
     return Agent(
         name="Math Agent",
         description="An agent that solves math problems",
         agent_engine=math_graph_engine,
-        id=math_graph_engine.agent_id,
+        id=math_agent_id,
         architect_agent_id=architect_agent.id,
         genetic_operator_agent_id=crossover_agent.id,
     )

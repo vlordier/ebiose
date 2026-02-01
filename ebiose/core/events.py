@@ -5,6 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import loguru
 from loguru import logger as _logger
 
 if TYPE_CHECKING:
@@ -48,7 +49,7 @@ class SelectionMethod(Enum):
 event_logger = _logger
 
 
-def elastic_sink(message: "Message") -> None:
+def elastic_sink(message: Message) -> None:
     record = message.record
     record_extra = record.get("extra", {})
     event_payload = (
@@ -82,9 +83,9 @@ def init_logger(
     forge_id: str | UUID | None,
     forge_cycle_id: str | UUID,
     initial_budget: float | None = None,
-) -> None:
-    global event_logger
-    event_logger = event_logger.bind(
+) -> loguru.Logger:
+    """Initialize and return a bound logger with context."""
+    return event_logger.bind(
         user_id=user_id,
         forge_id=forge_id,
         forge_cycle_id=forge_cycle_id,
@@ -106,12 +107,10 @@ class BaseEvent(BaseModel):
     )
 
     @computed_field
-    @property
     def event_name(self) -> str:
         return self.__class__.__name__
 
     @computed_field
-    @property
     def budget_usage_ratio(self) -> float | None:
         """Calculate the ratio of remaining budget to initial budget (0.0 to 1.0)."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -121,7 +120,6 @@ class BaseEvent(BaseModel):
         return self.remaining_budget / self.initial_budget
 
     @computed_field
-    @property
     def budget_spent_ratio(self) -> float | None:
         """Calculate the ratio of spent budget to initial budget (0.0 to 1.0)."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -131,7 +129,6 @@ class BaseEvent(BaseModel):
         return (self.initial_budget - self.remaining_budget) / self.initial_budget
 
     @computed_field
-    @property
     def budget_spent(self) -> float | None:
         """Calculate the amount of budget spent."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -142,7 +139,7 @@ class BaseEvent(BaseModel):
         return self.model_dump(mode="json")
 
     def log(self, message_override: str | None = None) -> None:
-        """Logs this event using Loguru.
+        """Log this event using Loguru.
 
         The event data is bound to the log record for consumption by structured logging sinks.
         """
@@ -202,7 +199,7 @@ class PopulationInitializationStartedEvent(BaseEvent):
 
     n_agents_to_initialize: int
     n_selected_from_ecosystem: int
-    generation_number: int = Field(
+    generation_number: int | None = Field(
         default=0,
         description="Always 0 during initialization",
     )
@@ -228,7 +225,7 @@ class PopulationInitializationCompletedEvent(BaseEvent):
     num_agents_initialized: int
     initialization_cost: float
     duration_seconds: float
-    generation_number: int = Field(
+    generation_number: int | None = Field(
         default=0,
         description="Always 0 during initialization",
     )

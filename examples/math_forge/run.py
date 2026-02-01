@@ -6,6 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 import asyncio
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -16,35 +17,39 @@ from ebiose.core.forge_cycle import CloudForgeCycleConfig
 from examples.math_forge.math_forge import MathLangGraphForge
 
 
-def main(
-    train_csv_path: str,
-    test_csv_path: str,
-    n_problems: int,
-    budget: float,
-    save_path: Path,
-    default_model_endpoint_id: str | None = None,
-    mode: Literal["cloud", "local"] = "cloud",
-) -> None:
+@dataclass
+class RunConfig:
+    """Configuration for run."""
+
+    train_csv_path: str
+    test_csv_path: str
+    save_path: Path
+    n_problems: int
+    budget: float
+    default_model_endpoint_id: str | None = None
+    mode: Literal["cloud", "local"] = "cloud"
+
+
+def main(config: RunConfig) -> None:
     forge = MathLangGraphForge(
-        train_csv_path=train_csv_path,
-        test_csv_path=test_csv_path,
-        n_problems=n_problems,
-        default_model_endpoint_id=default_model_endpoint_id,
+        train_csv_path=config.train_csv_path,
+        test_csv_path=config.test_csv_path,
+        n_problems=config.n_problems,
+        default_model_endpoint_id=config.default_model_endpoint_id,
     )
 
     cycle_config = None
-    if mode == "cloud":
+    if config.mode == "cloud":
         cycle_config = CloudForgeCycleConfig(
-            budget=budget,
+            budget=config.budget,
             n_agents_in_population=2,
             n_selected_agents_from_ecosystem=1,
             n_best_agents_to_return=2,
             replacement_ratio=0.5,
-            local_results_path=save_path,
+            local_results_path=config.save_path,
         )
     else:
-        print("Running in local mode is not fully implemented yet.")  # noqa: T201
-        sys.exit("Local mode not fully implemented yet.")
+        sys.exit("Running in local mode is not fully implemented yet.")
 
     best_agents, best_finess = asyncio.run(
         forge.run_new_cycle(config=cycle_config),
@@ -75,7 +80,7 @@ if __name__ == "__main__":
     )
 
     # running the forge cycle
-    main(
+    config = RunConfig(
         train_csv_path=TRAIN_CSV_PATH,
         test_csv_path=TEST_CSV_PATH,
         n_problems=N_PROBLEMS,
@@ -84,3 +89,4 @@ if __name__ == "__main__":
         default_model_endpoint_id=DEFAULT_MODEL_ENDPOINT_ID,
         mode="cloud",
     )
+    main(config)

@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import time
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
 
 from IPython import get_ipython
@@ -25,6 +25,7 @@ from ebiose.core.events import (
     AgentEvaluationCompletedEvent,
     AgentSelectionCompletedEvent,
     AgentSelectionStartedEvent,
+    AgentSource,
     ArchitectAgentTaskCreatedEvent,
     CrossoverAndMutationCompletedEvent,
     CrossoverAndMutationStartedEvent,
@@ -38,6 +39,7 @@ from ebiose.core.events import (
     PopulationEvaluationStartedEvent,
     PopulationInitializationCompletedEvent,
     PopulationInitializationStartedEvent,
+    SelectionMethod,
     init_logger,
 )
 from ebiose.core.llm_api_factory import LLMApiFactory
@@ -49,13 +51,16 @@ if get_ipython() is not None:
 from loguru import logger
 from tqdm.asyncio import tqdm
 
-from ebiose.core.agent import Agent
 from ebiose.tools.agent_generation_task_with_fallback import (
+    CrossoverAgentTaskConfig,
     architect_agent_task,
     crossover_agent_task,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from ebiose.core.agent import Agent
     from ebiose.core.agent_forge import AgentForge
     from ebiose.core.ecosystem import Ecosystem
     from ebiose.core.llm_api import LLMApi
@@ -83,6 +88,8 @@ class ForgeCycleConfig(BaseModel):
     replacement_ratio: float = 0.5
     tournament_size_ratio: float = 0.1
     local_results_path: Path | None = None
+    budget: float = 0.0
+    n_generations: int = 0
     mode: Literal["local", "cloud"]
 
 
@@ -105,12 +112,12 @@ class ForgeCycle:
     )  # Changed Pydantic Field to dataclasses.field
 
     cur_generation: int = 0
-    llm_api: LLMApi | None = None
+    llm_api: type[LLMApi] | None = None
 
     agents: dict[str, Agent] = field(default_factory=dict)
     agents_fitness: dict[str, float] = field(default_factory=dict)
     agents_first_generation_costs: dict[str, float] = field(default_factory=dict)
-    init_agents_population: dict[Agent] = field(default_factory=list)
+    init_agents_population: list[Agent] = field(default_factory=list)
 
     architect_agents: dict[str, Agent] = field(default_factory=dict)
     genetic_operator_agents: dict[str, Agent] = field(default_factory=dict)
@@ -123,8 +130,8 @@ class ForgeCycle:
                 )
             else:
                 full_save_path = Path(self.config.local_results_path) / "init"
-            if not Path.exists(full_save_path):
-                Path.mkdir(full_save_path, parents=True)
+            if not full_save_path.exists():
+                full_save_path.mkdir(parents=True)
             logger.debug(f"Saving current state to {full_save_path}")
 
             # save agents
@@ -136,9 +143,9 @@ class ForgeCycle:
             with Path.open(fitness_file_path, "w") as fitness_file:
                 fitness_file.write(json.dumps(self.agents_fitness, indent=4))
 
-    def _save_agents(self, agents_folder: str) -> None:
-        if not Path.exists(agents_folder):
-            Path.mkdir(agents_folder, parents=True)
+    def _save_agents(self, agents_folder: Path) -> None:
+        if not agents_folder.exists():
+            agents_folder.mkdir(parents=True)
 
         for agent_id, agent in self.agents.items():
             agent_file_path = Path(agents_folder) / f"{agent_id}.json"
@@ -151,25 +158,30 @@ class ForgeCycle:
 
         Returns:
             tuple: (remaining_budget, initial_budget) or (None, None) if not in cloud mode
+
         """
-        if self.config.mode == "cloud" and hasattr(self.config, "budget"):
+        if self.config.mode == "cloud" and self.llm_api is not None:
             total_cost = self.llm_api.get_total_cost(forge_cycle_id=self.id)
             remaining_budget = self.config.budget - total_cost
             return remaining_budget, self.config.budget
         return None, None
 
-    def add_agent(self, agent: Agent, source: str) -> None:
+    def add_agent(self, agent: Agent, source: AgentSource) -> None:
         try:
-            if self.config.mode == "cloud" and source != "kept_from_previous_gen":
+            if (
+                self.config.mode == "cloud"
+                and source != AgentSource.KEPT_FROM_PREVIOUS_GEN
+            ):
                 # TODO(xabier): improve condition to avoid pushing an agent twice
                 agent_id = EbioseAPIClient.add_agent_from_forge_cycle(
                     forge_cycle_id=self.id,
                     agent=agent,
                 )
                 agent.id = agent_id
-                agent.agent_engine.agent_id = (
-                    agent_id  # Ensure agent's engine has the correct ID
-                )
+                if agent.agent_engine is not None:
+                    agent.agent_engine.agent_id = (
+                        agent_id  # Ensure agent's engine has the correct ID
+                    )
             self.agents[agent.id] = agent
             remaining_budget, initial_budget = self.get_budget_info()
             AgentAddedToPopulationEvent(
@@ -183,11 +195,25 @@ class ForgeCycle:
                 remaining_budget=remaining_budget,
                 initial_budget=initial_budget,
             ).log()
-        except Exception as e:
+        except (ValueError, TypeError, RuntimeError) as e:
             logger.debug(f"Error while adding an agent: {e!s}, {agent}")
 
-    def check_agent_type(self, agent: Agent) -> None:
+    def _require_llm_api(self) -> type[LLMApi]:
+        if self.llm_api is None:
+            msg = "LLM API is not initialized"
+            raise RuntimeError(msg)
+        return self.llm_api
+
+    def check_agent_type(
+        self,
+        agent: Agent,
+    ) -> Literal["crossover", "mutation", "architect", "standard"]:
         # TODO(xabier): replace this method by a "agent_type" field in Agent class
+        if (
+            agent.agent_engine is None
+            or agent.agent_engine.input_model is None
+        ):
+            return "standard"
         if "parent_configuration1" in agent.agent_engine.input_model.model_fields:
             return "crossover"
         if "parent_configuration" in agent.agent_engine.input_model.model_fields:
@@ -210,25 +236,13 @@ class ForgeCycle:
             if agent_type == self.check_agent_type(agent)
         }
 
-    async def initialize_population(
+    def _select_agents_from_ecosystem(
         self,
         ecosystem: Ecosystem,
-    ) -> None:  # Removed quotes from Ecosystem type hint
-        logger.info("****** Initializing agents population ******")
-        remaining_budget, initial_budget = self.get_budget_info()
-        PopulationInitializationStartedEvent(
-            n_agents_to_initialize=self.config.n_agents_in_population,
-            n_selected_from_ecosystem=self.config.n_selected_agents_from_ecosystem,
-            remaining_budget=remaining_budget,
-            initial_budget=initial_budget,
-        ).log()
-        init_pop_start_time = time()
-
-        self.agents.clear()
-        self.agents_first_generation_costs.clear()
-
+    ) -> list[Agent]:
+        """Select agents from ecosystem if in cloud mode."""
+        selected_agents: list[Agent] = []
         n_selected_agents = self.config.n_selected_agents_from_ecosystem
-        selected_agents = []
         if self.config.mode == "cloud":
             selected_agents = EbioseAPIClient.select_agents(
                 nb_agents=n_selected_agents,
@@ -244,22 +258,92 @@ class ForgeCycle:
         logger.debug(
             f"{len(selected_agents)} agents selected from ecosystem over {n_selected_agents} requested",
         )
+        return selected_agents
 
-        # Initialize population
+    def _create_initial_generation_tasks(self, ecosystem: Ecosystem) -> list[Any]:
+        """Create architect tasks for initial population from scratch."""
         tasks = []
-        if n_selected_agents == 0 or len(selected_agents) == 0:
-            # when no agents are selected from the ecosystem
-            logger.info(
-                f"Creating {self.config.n_agents_in_population} new agents with architect agents...",
+        architect_agents = ecosystem.initial_architect_agents or []
+        genetic_operator_agents = ecosystem.initial_genetic_operator_agents or []
+        if not architect_agents or not genetic_operator_agents:
+            msg = "Ecosystem meta agents are not initialized"
+            raise RuntimeError(msg)
+
+        for _ in range(self.config.n_agents_in_population):
+            architect_agent = random.choice(architect_agents)
+            if (
+                architect_agent.agent_engine is None
+                or architect_agent.agent_engine.input_model is None
+            ):
+                msg = "Architect agent input model is not configured"
+                raise RuntimeError(msg)
+            architect_agent_input = architect_agent.agent_engine.input_model(
+                forge_description=self.forge.description,
             )
-            for _ in range(self.config.n_agents_in_population):
-                architect_agent = random.choice(ecosystem.initial_architect_agents)
+            genetic_operator_agent = random.choice(genetic_operator_agents)
+
+            task = architect_agent_task(
+                forge=self.forge,
+                architect_agent=architect_agent,
+                architect_agent_input=architect_agent_input,
+                genetic_operator_agent=genetic_operator_agent,
+                forge_cycle_id=self.id,
+            )
+            remaining_budget, initial_budget = self.get_budget_info()
+            ArchitectAgentTaskCreatedEvent(
+                architect_agent_id=architect_agent.id,
+                generation_number=self.cur_generation,
+                remaining_budget=remaining_budget,
+                initial_budget=initial_budget,
+            ).log()
+            tasks.append(task)
+        return tasks
+
+    def _create_generation_from_selected_tasks(
+        self,
+        selected_agents: list[Agent],
+    ) -> list[Any]:
+        """Create architect tasks from selected agents."""
+        tasks = []
+        logger.info(
+            f"{len(selected_agents)} selected agents from ecosystem. Creating {self.config.n_agents_in_population - len(selected_agents)} agents...",
+        )
+
+        while len(tasks) < (
+            self.config.n_agents_in_population - len(selected_agents)
+        ):
+            for selected_agent in selected_agents:
+                if len(tasks) >= self.config.n_agents_in_population:
+                    break
+
+                architect_agent_id = selected_agent.architect_agent_id
+                if (
+                    architect_agent_id is None
+                    or architect_agent_id not in self.architect_agents
+                ):
+                    architect_agent = random.choice(
+                        list(self.architect_agents.values()),
+                    )
+                else:
+                    architect_agent = self.architect_agents[architect_agent_id]
+                if (
+                    architect_agent.agent_engine is None
+                    or architect_agent.agent_engine.input_model is None
+                ):
+                    msg = "Architect agent input model is not configured"
+                    raise RuntimeError(msg)
                 architect_agent_input = architect_agent.agent_engine.input_model(
                     forge_description=self.forge.description,
                 )
-                genetic_operator_agent = random.choice(
-                    ecosystem.initial_genetic_operator_agents,
-                )
+                genetic_operator_agent = None
+                genetic_operator_agent_id = selected_agent.genetic_operator_agent_id
+                if (
+                    genetic_operator_agent_id is not None
+                    and genetic_operator_agent_id in self.genetic_operator_agents
+                ):
+                    genetic_operator_agent = self.genetic_operator_agents[
+                        genetic_operator_agent_id
+                    ]
 
                 task = architect_agent_task(
                     forge=self.forge,
@@ -276,60 +360,49 @@ class ForgeCycle:
                     initial_budget=initial_budget,
                 ).log()
                 tasks.append(task)
-        else:
-            # when some agents are selected from the ecosystem
+        return tasks
+
+    async def initialize_population(
+        self,
+        ecosystem: Ecosystem,
+    ) -> float:  # Removed quotes from Ecosystem type hint
+        logger.info("****** Initializing agents population ******")
+        remaining_budget, initial_budget = self.get_budget_info()
+        PopulationInitializationStartedEvent(
+            n_agents_to_initialize=self.config.n_agents_in_population,
+            n_selected_from_ecosystem=self.config.n_selected_agents_from_ecosystem,
+            remaining_budget=remaining_budget,
+            initial_budget=initial_budget,
+        ).log()
+        init_pop_start_time = time()
+
+        self.agents.clear()
+        self.agents_first_generation_costs.clear()
+
+        n_selected_agents = self.config.n_selected_agents_from_ecosystem
+        selected_agents = self._select_agents_from_ecosystem(ecosystem)
+
+        # Initialize population
+        if n_selected_agents == 0 or len(selected_agents) == 0:
             logger.info(
-                f"{len(selected_agents)} selected agents from ecosystem. Creating {self.config.n_agents_in_population - len(selected_agents)} agents...",
+                f"Creating {self.config.n_agents_in_population} new agents with architect agents...",
             )
-
-            while len(tasks) < (
-                self.config.n_agents_in_population - len(selected_agents)
-            ):
-                for selected_agent in selected_agents:
-                    if len(tasks) >= self.config.n_agents_in_population:
-                        break
-
-                    # TODO(xabier): if selected agent is an architect agent
-                    # it does not have an architect agent...
-                    architect_agent = self.architect_agents[
-                        selected_agent.architect_agent_id
-                    ]
-                    architect_agent_input = architect_agent.agent_engine.input_model(
-                        forge_description=self.forge.description,
-                    )
-                    genetic_operator_agent = None
-                    if selected_agent.genetic_operator_agent_id is not None:
-                        genetic_operator_agent = self.genetic_operator_agents[
-                            selected_agent.genetic_operator_agent_id
-                        ]
-
-                    task = architect_agent_task(
-                        forge=self.forge,
-                        architect_agent=architect_agent,
-                        architect_agent_input=architect_agent_input,
-                        genetic_operator_agent=genetic_operator_agent,
-                        forge_cycle_id=self.id,
-                    )
-                    remaining_budget, initial_budget = self.get_budget_info()
-                    ArchitectAgentTaskCreatedEvent(
-                        architect_agent_id=architect_agent.id,
-                        generation_number=self.cur_generation,
-                        remaining_budget=remaining_budget,
-                        initial_budget=initial_budget,
-                    ).log()
-                    tasks.append(task)
+            tasks = self._create_initial_generation_tasks(ecosystem)
+        else:
+            tasks = self._create_generation_from_selected_tasks(selected_agents)
 
         results = await tqdm.gather(*tasks)
 
         for selected_agent in selected_agents if n_selected_agents > 0 else []:
-            self.add_agent(selected_agent, source="from_ecosystem")
+            self.add_agent(selected_agent, source=AgentSource.FROM_ECOSYSTEM)
 
         for new_agent in results:
             if new_agent is None:
                 continue
-            self.add_agent(new_agent, source="newly_created_during_init")
+            self.add_agent(new_agent, source=AgentSource.NEWLY_CREATED_DURING_INIT)
 
-        initialization_cost = self.llm_api.get_total_cost(forge_cycle_id=self.id)
+        llm_api = self._require_llm_api()
+        initialization_cost = llm_api.get_total_cost(forge_cycle_id=self.id)
         remaining_budget, initial_budget = self.get_budget_info()
         PopulationInitializationCompletedEvent(
             num_agents_initialized=len(self.agents),
@@ -347,10 +420,6 @@ class ForgeCycle:
     ) -> None:
         # TODO(xabier): this should be used to get architect and genetic operator agents
         # only after agents are selected from the ecosystem
-        # self.agents = {
-        # _id: agent for _id, agent in ecosystem.agents.items()
-        # if agent.agent_type is None
-        # }
 
         meta_agent_endpoint_id = ModelEndpoints.get_default_meta_agent_endpoint_id()
         self.architect_agents = {
@@ -365,45 +434,71 @@ class ForgeCycle:
         }
 
         for agent in self.architect_agents.values():
-            agent.agent_engine.tags = ["architect_agent"]
+            if agent.agent_engine is not None:
+                agent.agent_engine.tags = ["architect_agent"]
 
         for agent in self.genetic_operator_agents.values():
-            agent.agent_engine.tags = ["genetic_operator_agent"]
+            if agent.agent_engine is not None:
+                agent.agent_engine.tags = ["genetic_operator_agent"]
 
         if meta_agent_endpoint_id is not None:
             # Set the model endpoint ID for each meta agent
             for agent in self.architect_agents.values():
-                agent.agent_engine.model_endpoint_id = meta_agent_endpoint_id
+                if agent.agent_engine is not None:
+                    agent.agent_engine.model_endpoint_id = meta_agent_endpoint_id
             for agent in self.genetic_operator_agents.values():
-                agent.agent_engine.model_endpoint_id = meta_agent_endpoint_id
+                if agent.agent_engine is not None:
+                    agent.agent_engine.model_endpoint_id = meta_agent_endpoint_id
 
-    async def execute_a_cycle(
-        self,
-        ecosystem: Ecosystem | None,  # Removed quotes from Ecosystem type hint
-        lite_llm_api_key: str | None = None,
-    ) -> tuple[dict[str, Agent], dict[str, float]]:
-        cycle_start_time = time()
-        total_cycle_cost = 0.0
-
+    async def _setup_cloud_mode(self) -> tuple[str | None, str | None, str | None, str | None]:
+        """Set up cloud mode and return API credentials and IDs."""
         lite_llm_api_key = None
-        user_id = None
+        lite_llm_api_base = None
+        forge_cycle_id = None
+        forge_id = None
+
         if self.config.mode == "cloud":
             ecosystem_uuid = EbioseAPIClient.get_first_ecosystem_uuid()
-            ecosystem = EbioseAPIClient.get_ecosystem(ecosystem_uuid)
-            # call cloud start forge cycle
-            # returns: lite llm api key and forge cycle id
+            if ecosystem_uuid is None:
+                msg = "No ecosystem UUID available"
+                raise RuntimeError(msg)
             lite_llm_api_key, lite_llm_api_base, forge_cycle_id, forge_id = (
                 EbioseAPIClient.start_new_forge_cycle(
                     ecosystem_id=ecosystem_uuid,
                     forge_name=self.forge.name,
                     forge_description=self.forge.description,
                     forge_cycle_config=self.config,
-                    override_key=True,  # TODO(xabier): see how to do this properly
+                    override_key=True,
                 )
             )
             self.id = forge_cycle_id
-            user_id = EbioseAPIClient.get_user_id()
 
+        return lite_llm_api_key, lite_llm_api_base, forge_cycle_id, forge_id
+
+    async def _run_generational_loop(self, first_evaluation_cost: float, first_genetic_cost: float) -> float:
+        """Run the generational loop and return total cost."""
+        total_cycle_cost = first_evaluation_cost + first_genetic_cost
+        estimated_cost_to_complete_cycle = 2 * first_evaluation_cost + first_genetic_cost
+
+        while (
+            self.config.budget - total_cycle_cost > estimated_cost_to_complete_cycle
+            if self.config.mode == "cloud"
+            else self.cur_generation < self.config.n_generations
+        ):
+            self.cur_generation += 1
+            evaluation_cost, genetic_cost = await self.run_generation()
+            total_cycle_cost += evaluation_cost + genetic_cost
+
+        return total_cycle_cost
+
+    def _setup_and_initialize_llm_api(
+        self,
+        lite_llm_api_key: str | None,
+        lite_llm_api_base: str | None,
+        user_id: str | None,
+        forge_id: str | None,
+    ) -> None:
+        """Initialize logger and LLM API."""
         init_logger(
             user_id=user_id,
             forge_id=forge_id,
@@ -419,6 +514,109 @@ class ForgeCycle:
             lite_llm_api_base=lite_llm_api_base,
         )
 
+    def _distribute_cycle_cost(self, total_cycle_cost: float) -> None:
+        """Distribute total cycle cost among agents based on initialization costs."""
+        total_init_cost = sum(self.agents_first_generation_costs.values())
+        for agent_id, init_cost in self.agents_first_generation_costs.items():
+            cost_ratio = init_cost / total_init_cost if total_init_cost > 0 else 0
+            agent_cycle_cost = cost_ratio * total_cycle_cost
+            self.agents_first_generation_costs[agent_id] = agent_cycle_cost
+
+    async def _execute_generational_cycle(self, ecosystem: Ecosystem) -> tuple[float, list[Agent], float]:
+        """Execute the generational cycle and return cost, sorted agents, and start time."""
+        t0 = time()
+        initialization_cost = await self.initialize_population(ecosystem=ecosystem)
+
+        if len(self.agents) == 0:
+            logger.info(
+                "No agent was initialized. Exiting cycle. Check the logs for more information.",
+            )
+            return -1.0, [], t0
+
+        total_cycle_cost = initialization_cost
+        logger.info(
+            f"Budget left after initialization: {self.config.budget - total_cycle_cost} $",
+        )
+
+        self.cur_generation += 1
+        first_evaluation_cost, first_genetic_cost = await self.run_generation()
+        total_cycle_cost += await self._run_generational_loop(first_evaluation_cost, first_genetic_cost)
+
+        # Evaluate last offsprings before sorting
+        total_cycle_cost += await self._evaluate_population()
+        self.save_current_state(self.cur_generation + 1)
+
+        # Distribute total cycle cost among agents
+        self._distribute_cycle_cost(total_cycle_cost)
+
+        sorted_agents = sorted(
+            self.agents.values(),
+            key=lambda agent: self.agents_fitness[agent.id],
+            reverse=True,
+        )
+        return total_cycle_cost, sorted_agents, t0
+
+    def _build_success_result(
+        self,
+        sorted_agents: list[Agent],
+        total_cycle_cost: float,
+        cycle_start_time: float,
+        t0: float,
+    ) -> tuple[dict[str, Agent], dict[str, float]]:
+        """Build successful cycle result from sorted agents."""
+        logger.info(
+            f"Cycle completed in {human_readable_duration(t0)} with a total cost of {total_cycle_cost} $",
+        )
+        if self.config.mode == "cloud":
+            logger.info(
+                f"Budget left at final: {self.config.budget - self._require_llm_api().get_total_cost(forge_cycle_id=self.id)} $",
+            )
+        logger.info(f"Returning {self.config.n_best_agents_to_return} best agents")
+
+        selected_agents = {
+            agent.id: agent
+            for agent in sorted_agents[: self.config.n_best_agents_to_return]
+        }
+        selected_fitness = {
+            agent_id: self.agents_fitness[agent_id] for agent_id in selected_agents
+        }
+        remaining_budget, initial_budget = self.get_budget_info()
+        ForgeCycleEndedEvent(
+            duration_seconds=time() - cycle_start_time,
+            total_cost=total_cycle_cost,
+            num_best_agents=len(selected_agents),
+            remaining_budget=remaining_budget,
+            initial_budget=initial_budget,
+        ).log()
+        return selected_agents, selected_fitness
+
+    async def execute_a_cycle(
+        self,
+        ecosystem: Ecosystem | None,
+        lite_llm_api_key: str | None = None,
+    ) -> tuple[dict[str, Agent], dict[str, float]]:
+        cycle_start_time = time()
+        selected_agents: dict[str, Agent] = {}
+        selected_fitness: dict[str, float] = {}
+        forge_cycle_id = None
+
+        # Setup cloud mode if needed
+        lite_llm_api_key, _lite_llm_api_base, forge_cycle_id, _forge_id = await self._setup_cloud_mode()
+        user_id = EbioseAPIClient.get_user_id() if self.config.mode == "cloud" else None
+
+        if self.config.mode == "cloud":
+            ecosystem_uuid = EbioseAPIClient.get_first_ecosystem_uuid()
+            if ecosystem_uuid is None:
+                msg = "No ecosystem UUID available"
+                raise RuntimeError(msg)
+            ecosystem = EbioseAPIClient.get_ecosystem(ecosystem_uuid)
+
+        if ecosystem is None:
+            msg = "Ecosystem is required to execute a cycle"
+            raise RuntimeError(msg)
+
+        self._setup_and_initialize_llm_api(lite_llm_api_key, _lite_llm_api_base, user_id, _forge_id)
+
         remaining_budget, initial_budget = self.get_budget_info()
         ForgeCycleStartedEvent(
             forge_name=self.forge.name,
@@ -428,21 +626,10 @@ class ForgeCycle:
             initial_budget=initial_budget,
         ).log()
 
-        if ecosystem is None:
-            # TODO(xabier): this does not work
-            from ebiose.core.ecosystem import Ecosystem
-
-            ecosystem = Ecosystem.new()
-
         try:
-            t0 = time()
-            total_cycle_cost = 0
-            initialization_cost = await self.initialize_population(ecosystem=ecosystem)
-            # cancel run if no agent was initialized
-            if len(self.agents) == 0:
-                logger.info(
-                    "No agent was initialized. Exiting cycle. Check the logs for more information.",
-                )
+            total_cycle_cost, sorted_agents, t0 = await self._execute_generational_cycle(ecosystem)
+
+            if total_cycle_cost < 0:
                 remaining_budget, initial_budget = self.get_budget_info()
                 ForgeCycleFailedEvent(
                     error_message="No agent was initialized",
@@ -450,51 +637,13 @@ class ForgeCycle:
                     remaining_budget=remaining_budget,
                     initial_budget=initial_budget,
                 ).log()
-                selected_agents, selected_fitness = {}, {}
-                return selected_agents, selected_fitness
+                return {}, {}
 
-            total_cycle_cost += initialization_cost
-            logger.info(
-                f"Budget left after initialization: {self.config.budget - total_cycle_cost} $",
+            selected_agents, selected_fitness = self._build_success_result(
+                sorted_agents, total_cycle_cost, cycle_start_time, t0,
             )
 
-            # running generation 1
-            self.cur_generation += 1
-            first_evaluation_cost, first_genetic_cost = await self.run_generation()
-            estimated_cost_to_complete_cycle = (
-                2 * first_evaluation_cost + first_genetic_cost
-            )
-            total_cycle_cost += first_evaluation_cost + first_genetic_cost
-
-            # running next generations until budget is reached
-            while (
-                self.config.budget - total_cycle_cost > estimated_cost_to_complete_cycle
-                if self.config.mode == "cloud"
-                else self.cur_generation < self.config.n_generations
-            ):
-                self.cur_generation += 1
-                evaluation_cost, genetic_cost = await self.run_generation()
-                total_cycle_cost += evaluation_cost + genetic_cost
-
-            # Evaluate last offsprings before sorting all population by fitness
-            total_cycle_cost += await self._evaluate_population()
-            # TODO(xabier): this is a hack to save last evaluation
-            self.save_current_state(self.cur_generation + 1)
-
-            # Distribute total cycle cost among agents based on their initialization costs
-            total_init_cost = sum(self.agents_first_generation_costs.values())
-            for agent_id, init_cost in self.agents_first_generation_costs.items():
-                cost_ratio = init_cost / total_init_cost if total_init_cost > 0 else 0
-                agent_cycle_cost = cost_ratio * total_cycle_cost
-                self.agents_first_generation_costs[agent_id] = agent_cycle_cost
-
-            sorted_agents = sorted(
-                self.agents.values(),
-                key=lambda agent: self.agents_fitness[agent.id],
-                reverse=True,
-            )
-
-        except Exception as e:
+        except (ValueError, TypeError, RuntimeError, KeyError) as e:
             logger.error(f"Error during cycle execution: {e!s}")
             logger.info("Cycle execution failed. Cleaning up...")
             remaining_budget, initial_budget = self.get_budget_info()
@@ -504,41 +653,15 @@ class ForgeCycle:
                 remaining_budget=remaining_budget,
                 initial_budget=initial_budget,
             ).log()
-            selected_agents, selected_fitness = {}, {}
-        else:
-            logger.info(
-                f"Cycle completed in {human_readable_duration(t0)} with a total cost of {total_cycle_cost} $",
-            )
-            if self.config.mode == "cloud":
-                logger.info(
-                    f"Budget left at final: {self.config.budget - self.llm_api.get_total_cost(forge_cycle_id=self.id)} $",
-                )
-            logger.info(f"Returning {self.config.n_best_agents_to_return} best agents")
-
-            selected_agents = {
-                agent.id: agent
-                for agent in sorted_agents[: self.config.n_best_agents_to_return]
-            }
-            selected_fitness = {
-                agent_id: self.agents_fitness[agent_id] for agent_id in selected_agents
-            }
-            remaining_budget, initial_budget = self.get_budget_info()
-            ForgeCycleEndedEvent(
-                duration_seconds=time() - cycle_start_time,
-                total_cost=total_cycle_cost,
-                num_best_agents=len(selected_agents),
-                remaining_budget=remaining_budget,
-                initial_budget=initial_budget,
-            ).log()
-            return selected_agents, selected_fitness
 
         finally:
-            # Clean up
             if self.config.mode == "cloud":
                 EbioseAPIClient.end_forge_cycle(
                     forge_cycle_uuid=forge_cycle_id,
                     winning_agents=list(selected_agents.values()),
                 )
+
+        return selected_agents, selected_fitness
 
     async def run_generation(self) -> tuple[float, float]:
         logger.info(f"****** Running generation {self.cur_generation} ******")
@@ -575,10 +698,7 @@ class ForgeCycle:
         selected_parent_ids_for_crossover = self.tournament_selection(
             n_to_select=n_replaced,
         )
-        if (
-            selected_parent_ids_for_crossover is None
-            or len(selected_parent_ids_for_crossover) == 0
-        ):
+        if len(selected_parent_ids_for_crossover) == 0:
             # TODO (xabier): throw and error or fallback to architect agents?
             logger.warning(
                 "No parents selected for crossover. This may lead to no new agents being created.",
@@ -596,13 +716,11 @@ class ForgeCycle:
         self.agents.clear()
         self.agents_fitness.clear()
 
-        for agent_id, agent_obj in kept_agents.items():
-            self.add_agent(agent_obj, source="kept_from_previous_gen")
-            # avoiding to recompute fitness has to be handled by the forge
-            # self.agents_fitness[agent_id] = current_agents_fitness[agent_id]
+        for agent_obj in kept_agents.values():
+            self.add_agent(agent_obj, source=AgentSource.KEPT_FROM_PREVIOUS_GEN)
 
         for offspring in offspring_agents:
-            self.add_agent(offspring, source="offspring")
+            self.add_agent(offspring, source=AgentSource.OFFSPRING)
 
         logger.info(
             f"Generation {self.cur_generation} completed in {human_readable_duration(t0)} with a total cost of TODO $",
@@ -642,12 +760,10 @@ class ForgeCycle:
         results = await tqdm.gather(*tasks)
 
         update_first_generation_costs = self.cur_generation == 0
-        total_cost_in_dollars = 0
+        total_cost_in_dollars = 0.0
         for agent_id, fitness in results:
-            # for index, agent_id in enumerate(self.agents.keys()):
-            # fitness = results[index]
             self.agents_fitness[agent_id] = fitness
-            current_agent_cost = self.llm_api.get_agent_cost(agent_id)
+            current_agent_cost = self._require_llm_api().get_agent_cost(agent_id)
             total_cost_in_dollars += current_agent_cost
             remaining_budget, initial_budget = self.get_budget_info()
             AgentEvaluationCompletedEvent(
@@ -688,18 +804,18 @@ class ForgeCycle:
         remaining_budget, initial_budget = self.get_budget_info()
         AgentSelectionStartedEvent(
             generation_number=self.cur_generation,
-            method="roulette_wheel",
+            method=SelectionMethod.ROULETTE_WHEEL,
             num_to_select=n_to_select,
             remaining_budget=remaining_budget,
             initial_budget=initial_budget,
         ).log()
-        selected_agents = {}
+        selected_agents: dict[str, Agent] = {}
         if not self.agents_fitness:
             logger.warning("No fitness values available for roulette wheel selection.")
             remaining_budget, initial_budget = self.get_budget_info()
             AgentSelectionCompletedEvent(
                 generation_number=self.cur_generation,
-                method="roulette_wheel",  # Added missing field
+                method=SelectionMethod.ROULETTE_WHEEL,
                 num_selected=0,
                 selected_agent_ids=[],
                 remaining_budget=remaining_budget,
@@ -711,7 +827,7 @@ class ForgeCycle:
         total_fitness = sum(self.agents_fitness.values())
         for _ in range(n_to_select):
             pick = random.uniform(0, total_fitness)
-            current = 0
+            current = 0.0
             for agent_id, fitness in self.agents_fitness.items():
                 current += fitness
                 if current >= pick:
@@ -725,7 +841,7 @@ class ForgeCycle:
         remaining_budget, initial_budget = self.get_budget_info()
         AgentSelectionCompletedEvent(
             generation_number=self.cur_generation,
-            method="roulette_wheel",  # Added missing field
+            method=SelectionMethod.ROULETTE_WHEEL,
             num_selected=len(selected_agents),
             selected_agent_ids=list(selected_agents.keys()),
             remaining_budget=remaining_budget,
@@ -741,18 +857,18 @@ class ForgeCycle:
         remaining_budget, initial_budget = self.get_budget_info()
         AgentSelectionStartedEvent(
             generation_number=self.cur_generation,
-            method="tournament",
+            method=SelectionMethod.TOURNAMENT,
             num_to_select=n_to_select,
             remaining_budget=remaining_budget,
             initial_budget=initial_budget,
         ).log()
-        selected_ids = []
+        selected_ids: list[str] = []
         if not self.agents:
             logger.warning("No agents available for tournament selection.")
             remaining_budget, initial_budget = self.get_budget_info()
             AgentSelectionCompletedEvent(
                 generation_number=self.cur_generation,
-                method="tournament",  # Added missing field
+                method=SelectionMethod.TOURNAMENT,
                 num_selected=0,
                 selected_agent_ids=[],
                 remaining_budget=remaining_budget,
@@ -794,13 +910,214 @@ class ForgeCycle:
         remaining_budget, initial_budget = self.get_budget_info()
         AgentSelectionCompletedEvent(
             generation_number=self.cur_generation,
-            method="tournament",  # Added missing field
+            method=SelectionMethod.TOURNAMENT,
             num_selected=len(selected_ids),
             selected_agent_ids=selected_ids,
             remaining_budget=remaining_budget,
             initial_budget=initial_budget,
         ).log()
         return selected_ids
+
+    def _handle_single_parent_mutation(
+        self,
+        parent_id: str,
+    ) -> tuple[Any, Agent | None]:
+        """Create mutation task for single parent fallback."""
+        parent = self.agents[parent_id]
+        architect_agent_id = parent.architect_agent_id
+        architect_agent = (
+            self.architect_agents.get(architect_agent_id)
+            if architect_agent_id is not None
+            else None
+        )
+
+        mut_agent_id = parent.genetic_operator_agent_id
+        if mut_agent_id is None:
+            mut_agents = self.get_agents_by_type("mutation")
+            mut_agent = (
+                random.choice(list(mut_agents.values())) if mut_agents else None
+            )
+        else:
+            mut_agent = self.genetic_operator_agents[mut_agent_id]
+
+        if mut_agent is not None and self.check_agent_type(mut_agent) != "mutation":
+            mut_agents = self.get_agents_by_type("mutation")
+            mut_agent = (
+                random.choice(list(mut_agents.values())) if mut_agents else None
+            )
+
+        if mut_agent is None:
+            logger.warning(
+                f"No mutation agent found for parent {parent_id}. Cannot perform mutation.",
+            )
+            return None, None
+
+        mut_engine = mut_agent.agent_engine
+        if mut_engine is None or mut_engine.input_model is None:
+            msg = "Mutation agent input model is not configured"
+            raise RuntimeError(msg)
+
+        parent_engine = parent.agent_engine
+        if parent_engine is None:
+            msg = "Parent agent engine is not configured"
+            raise RuntimeError(msg)
+
+        parent_graph = getattr(parent_engine, "graph", None)
+        if parent_graph is None:
+            msg = "Parent agent graph is not configured"
+            raise RuntimeError(msg)
+
+        mutation_input = mut_engine.input_model(
+            forge_description=self.forge.description,
+            parent_configuration=parent_graph.model_dump(),
+        )
+
+        task = crossover_agent_task(
+            CrossoverAgentTaskConfig(
+                forge=self.forge,
+                genetic_operator_agent=mut_agent,
+                crossover_agent_input=mutation_input,
+                architect_agent=architect_agent,
+                parent1=parent,
+                parent2=None,
+                master_agent_id=None,
+                forge_cycle_id=self.id,
+            ),
+        )
+        return task, None
+
+    def _handle_same_parent_mutation(
+        self,
+        p1_id: str,
+    ) -> Coroutine[Any, Any, Agent | None] | None:
+        """Create mutation task when both parents are the same."""
+        agent = self.agents[p1_id]
+        mut_id = agent.genetic_operator_agent_id or random.choice(
+            list(self.genetic_operator_agents.keys()),
+        )
+        mut_agent = self.genetic_operator_agents[mut_id]
+        architect_agent_id = agent.architect_agent_id
+        architect_agent = (
+            self.architect_agents.get(architect_agent_id)
+            if architect_agent_id is not None
+            else None
+        )
+
+        if self.check_agent_type(mut_agent) != "mutation":
+            mut_agents = self.get_agents_by_type("mutation")
+            mut_agent = (
+                random.choice(list(mut_agents.values())) if mut_agents else None
+            )
+
+        if mut_agent is None:
+            logger.warning(
+                f"No mutation agent found for parent {p1_id}. Cannot perform mutation.",
+            )
+            return None
+
+        mut_engine = mut_agent.agent_engine
+        if mut_engine is None or mut_engine.input_model is None:
+            msg = "Mutation agent input model is not configured"
+            raise RuntimeError(msg)
+
+        agent_engine = agent.agent_engine
+        if agent_engine is None:
+            msg = "Parent agent engine is not configured"
+            raise RuntimeError(msg)
+
+        agent_graph = getattr(agent_engine, "graph", None)
+        if agent_graph is None:
+            msg = "Parent agent graph is not configured"
+            raise RuntimeError(msg)
+
+        mutation_input = mut_engine.input_model(
+            forge_description=self.forge.description,
+            parent_configuration=agent_graph.model_dump(),
+        )
+
+        return crossover_agent_task(
+            CrossoverAgentTaskConfig(
+                forge=self.forge,
+                genetic_operator_agent=mut_agent,
+                crossover_agent_input=mutation_input,
+                architect_agent=architect_agent,
+                parent1=agent,
+                parent2=None,
+                master_agent_id=None,
+                forge_cycle_id=self.id,
+            ),
+        )
+
+    def _handle_true_crossover(
+        self,
+        parent1: Agent,
+        parent2: Agent,
+        p1_id: str,
+        p2_id: str,
+    ) -> Coroutine[Any, Any, Agent | None]:
+        """Create crossover task for two different parents."""
+        chosen_id = random.choice([p1_id, p2_id])
+        gen_op_id = self.agents[chosen_id].genetic_operator_agent_id
+        if gen_op_id is None:
+            if not self.genetic_operator_agents:
+                msg = "No genetic operator agents available"
+                raise RuntimeError(msg)
+            gen_op_agent = random.choice(
+                list(self.genetic_operator_agents.values()),
+            )
+        else:
+            gen_op_agent = self.genetic_operator_agents[gen_op_id]
+
+        architect_agent_id = self.agents[chosen_id].architect_agent_id
+        architect_agent = (
+            self.architect_agents.get(architect_agent_id)
+            if architect_agent_id is not None
+            else None
+        )
+
+        gen_op_engine = gen_op_agent.agent_engine
+        if gen_op_engine is None or gen_op_engine.input_model is None:
+            msg = "Genetic operator agent input model is not configured"
+            raise RuntimeError(msg)
+
+        parent1_engine = parent1.agent_engine
+        parent2_engine = parent2.agent_engine
+        if parent1_engine is None or parent2_engine is None:
+            msg = "Parent agent engine is not configured"
+            raise RuntimeError(msg)
+
+        parent1_graph = getattr(parent1_engine, "graph", None)
+        parent2_graph = getattr(parent2_engine, "graph", None)
+        if parent1_graph is None or parent2_graph is None:
+            msg = "Parent agent graph is not configured"
+            raise RuntimeError(msg)
+
+        if gen_op_agent.name == "crossover_agent":
+            input_model = gen_op_engine.input_model(
+                forge_description=self.forge.description,
+                parent_configuration1=parent1_graph.model_dump(),
+                parent_configuration2=parent2_graph.model_dump(),
+            )
+            parent2_for_task = parent2
+        else:
+            input_model = gen_op_engine.input_model(
+                forge_description=self.forge.description,
+                parent_configuration=parent1_graph.model_dump(),
+            )
+            parent2_for_task = None
+
+        return crossover_agent_task(
+            CrossoverAgentTaskConfig(
+                forge=self.forge,
+                genetic_operator_agent=gen_op_agent,
+                crossover_agent_input=input_model,
+                parent1=parent1,
+                parent2=parent2_for_task,
+                master_agent_id=None,
+                forge_cycle_id=self.id,
+                architect_agent=architect_agent,
+            ),
+        )
 
     async def crossover_and_mutate(
         self,
@@ -815,137 +1132,38 @@ class ForgeCycle:
         ).log()
 
         crossover_start_time = time()
-        previous_cost = self.llm_api.get_total_cost(forge_cycle_id=self.id)
-        offsprings = []
+        previous_cost = self._require_llm_api().get_total_cost(forge_cycle_id=self.id)
+        offsprings: list[Agent] = []
         tasks = []
 
         if len(selected_parent_ids) == 0:
-            # No parents for crossover or mutation
-            # TODO(xabier) should fallback to architect agents?
             return [], 0.0
 
-        # Single parent: fallback to mutation
         if len(selected_parent_ids) == 1:
-            parent_id = selected_parent_ids[0]
-            parent = self.agents[parent_id]
-            architect_agent = self.architect_agents.get(parent.architect_agent_id)
-
-            # Select mutation agent: embedded or random
-            mut_agent_id = parent.genetic_operator_agent_id
-            if mut_agent_id is None:
-                mut_agents = self.get_agents_by_type("mutation")
-                mut_agent = (
-                    random.choice(list(mut_agents.values())) if mut_agents else None
-                )
-            else:
-                mut_agent = self.genetic_operator_agents[mut_agent_id]
-            if self.check_agent_type(mut_agent) != "mutation":
-                # If the agent is not a mutation agent, we fallback to a random mutation agent
-                mut_agents = self.get_agents_by_type("mutation")
-                mut_agent = (
-                    random.choice(list(mut_agents.values())) if mut_agents else None
-                )
-            if mut_agent is None:
-                # TODO(xabier): fallback to architect agent?
-                logger.warning(
-                    f"No mutation agent found for parent {parent_id}. Cannot perform mutation.",
-                )
+            # Single parent: fallback to mutation
+            task, _ = self._handle_single_parent_mutation(selected_parent_ids[0])
+            if task is None:
                 return [], 0.0
-
-            # Build mutation input
-            mutation_input = mut_agent.agent_engine.input_model(
-                forge_description=self.forge.description,
-                parent_configuration=parent.agent_engine.graph.model_dump(),
-            )
-            # Schedule mutation task
-            task = crossover_agent_task(
-                forge=self.forge,
-                genetic_operator_agent=mut_agent,
-                crossover_agent_input=mutation_input,
-                architect_agent=architect_agent,
-                parent1=parent,
-                parent2=None,
-                master_agent_id=None,
-                forge_cycle_id=self.id,
-            )
             tasks.append(task)
         else:
-            # Standard crossover for parent pairs
+            # Multiple parents: standard crossover/mutation
             for p1_id in selected_parent_ids:
                 other_ids = [sp_id for sp_id in selected_parent_ids if sp_id != p1_id]
                 p2_id = random.choice(other_ids) if other_ids else p1_id
                 parent1 = self.agents[p1_id]
                 parent2 = self.agents[p2_id]
+
                 if p1_id == p2_id:
-                    # Same parent twice: fallback to mutation
-                    agent = parent1
-                    mut_id = agent.genetic_operator_agent_id or random.choice(
-                        list(self.genetic_operator_agents.keys()),
-                    )
-                    mut_agent = self.genetic_operator_agents[mut_id]
-                    architect_agent = self.architect_agents.get(
-                        agent.architect_agent_id,
-                    )
-                    if self.check_agent_type(mut_agent) != "mutation":
-                        # If the agent is not a mutation agent, we fallback to a random mutation agent
-                        mut_agents = self.get_agents_by_type("mutation")
-                        mut_agent = (
-                            random.choice(list(mut_agents.values()))
-                            if mut_agents
-                            else None
-                        )
-                    if mut_agent is None:
-                        # TODO(xabier): fallback to architect agent?
-                        logger.warning(
-                            f"No mutation agent found for parent {parent_id}. Cannot perform mutation.",
-                        )
+                    # Same parent twice: mutation
+                    task = self._handle_same_parent_mutation(p1_id)
+                    if task is None:
                         return [], 0.0
-                    mutation_input = mut_agent.agent_engine.input_model(
-                        forge_description=self.forge.description,
-                        parent_configuration=agent.agent_engine.graph.model_dump(),
-                    )
-                    task = crossover_agent_task(
-                        forge=self.forge,
-                        genetic_operator_agent=mut_agent,
-                        crossover_agent_input=mutation_input,
-                        architect_agent=architect_agent,
-                        parent1=agent,
-                        parent2=None,
-                        master_agent_id=None,
-                        forge_cycle_id=self.id,
-                    )
                 else:
-                    # True crossover
-                    # Select one of the parents' mutation/crossover agents
-                    chosen_id = random.choice([p1_id, p2_id])
-                    gen_op_id = self.agents[chosen_id].genetic_operator_agent_id
-                    gen_op_agent = self.genetic_operator_agents[gen_op_id]
-                    architect_agent = self.architect_agents.get(
-                        self.agents[chosen_id].architect_agent_id,
-                    )
-                    if gen_op_agent.name == "crossover_agent":
-                        input_model = gen_op_agent.agent_engine.input_model(
-                            forge_description=self.forge.description,
-                            parent_configuration1=parent1.agent_engine.graph.model_dump(),
-                            parent_configuration2=parent2.agent_engine.graph.model_dump(),
-                        )
-                    else:
-                        input_model = gen_op_agent.agent_engine.input_model(
-                            forge_description=self.forge.description,
-                            parent_configuration=parent1.agent_engine.graph.model_dump(),
-                        )
-                        parent2 = None
-                    task = crossover_agent_task(
-                        forge=self.forge,
-                        genetic_operator_agent=gen_op_agent,
-                        crossover_agent_input=input_model,
-                        parent1=parent1,
-                        parent2=parent2,
-                        master_agent_id=None,
-                        forge_cycle_id=self.id,
-                        architect_agent=architect_agent,
-                    )
+                    # Different parents: true crossover
+                    task = self._handle_true_crossover(parent1, parent2, p1_id, p2_id)
+
                 tasks.append(task)
+
         results = await tqdm.gather(*tasks)
         for offspring_agent in results:
             if offspring_agent is not None:
@@ -965,14 +1183,14 @@ class ForgeCycle:
                 ).log()
 
         current_phase_cost = (
-            self.llm_api.get_total_cost(forge_cycle_id=self.id) - previous_cost
+            self._require_llm_api().get_total_cost(forge_cycle_id=self.id) - previous_cost
         )
         remaining_budget, initial_budget = self.get_budget_info()
         CrossoverAndMutationCompletedEvent(
             generation_number=self.cur_generation,
             num_offsprings_generated=len(offsprings),
             duration_seconds=time() - crossover_start_time,
-            cost=current_phase_cost,  # This needs accurate calculation
+            cost=current_phase_cost,
             remaining_budget=remaining_budget,
             initial_budget=initial_budget,
         ).log()

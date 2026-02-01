@@ -19,10 +19,10 @@ def test_initialization_logic():
         / "llm_api.py"
     )
 
-    with open(llm_api_path, encoding="utf-8") as f:
+    with llm_api_path.open(encoding="utf-8") as f:
         llm_api_content = f.read()
 
-    with open(langgraph_api_path, encoding="utf-8") as f:
+    with langgraph_api_path.open(encoding="utf-8") as f:
         langgraph_api_content = f.read()
 
     # Check that the hardcoded URL is not present

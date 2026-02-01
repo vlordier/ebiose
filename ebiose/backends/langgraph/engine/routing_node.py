@@ -7,12 +7,9 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence  # noqa: TC003
-from typing import Literal, cast, Dict, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
-from langgraph.runtime import Runtime
-from pydantic import BaseModel  # noqa: TC002
 
 from ebiose.backends.langgraph.engine.states import (
     LangGraphEngineInputState,
@@ -21,6 +18,11 @@ from ebiose.backends.langgraph.engine.states import (
 from ebiose.core.engines.graph_engine.nodes.routing_node import (
     RoutingNode,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pydantic import BaseModel
 
 
 class InputState(LangGraphEngineInputState):
@@ -80,6 +82,7 @@ class LangGraphRoutingNode(RoutingNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        _ = config  # Unused parameter
         # Handle union type: state can be InputState or dict
         if isinstance(state, dict):
             messages = state.get("messages", [])
@@ -138,7 +141,7 @@ class LangGraphRoutingNode(RoutingNode):
 
         if count == 1:
             return cast(
-                Dict[str, Any],
+                "dict[str, Any]",
                 self.output_state_model(
                     messages=self.get_messages(condition="found")
                     if hasattr(self, "output_state_model")
@@ -153,7 +156,7 @@ class LangGraphRoutingNode(RoutingNode):
             else "The message contains more than one of the possible conditions."
         )
         return cast(
-            Dict[str, Any],
+            "dict[str, Any]",
             self.output_state_model(
                 messages=self.get_messages("error", error_message)
                 if hasattr(self, "output_state_model")
@@ -162,14 +165,4 @@ class LangGraphRoutingNode(RoutingNode):
                 condition="not_found",
                 output_condition=output_condition,
             ),
-        )
-        error_message = (
-            "The message does not contain any of the possible conditions."
-            if count == 0
-            else "The message contains more than one of the possible conditions."
-        )
-        return self.output_state_model(
-            messages=self.get_messages("not_found", error_message=error_message),
-            condition="not_found",
-            error_message=error_message,
         )

@@ -7,7 +7,8 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, Self, cast, Union, Optional
+from collections.abc import Callable
+from typing import Any, Literal, Self, TypeVar, cast
 
 from langfuse import observe
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
@@ -17,18 +18,22 @@ from ebiose.core.agent_engine import AgentEngine
 from ebiose.core.agent_engine_factory import AgentEngineFactory
 from ebiose.tools.embedding_helper import generate_embeddings
 
-
 # Agent type literals for better type safety
+
+
+F = TypeVar("F", bound=Callable[..., Any])
+_ObserveDecorator = Callable[..., Callable[[F], F]]
+_observe_typed = cast("_ObserveDecorator", observe)
 
 
 class Agent(BaseModel):
     id: str = Field(default_factory=lambda: "agent-" + str(uuid.uuid4()))
-    name: str
+    name: str | None = None
     agent_type: Literal["architect", "genetic_operator"] | None = None
     description: str | None = None
     architect_agent_id: str | None = None
     genetic_operator_agent_id: str | None = None
-    architect_agent: "Agent" | None = (
+    architect_agent: Agent | None = (
         None  # Reference to the architect agent if this is a generated agent
     )
     parent_ids: list[str] = Field(default_factory=list)
@@ -70,12 +75,12 @@ class Agent(BaseModel):
         return data
 
     @classmethod
-    def validate_agent_engine(cls, agent_engine: dict | AgentEngine) -> AgentEngine:
+    def validate_agent_engine(cls, agent_engine: dict[str, Any] | AgentEngine) -> AgentEngine:
         if isinstance(agent_engine, dict):
             return AgentEngineFactory.create_engine(
-                engine_type=agent_engine["engine_type"],
+                engine_type=cast("str", agent_engine["engine_type"]),
                 configuration=agent_engine["configuration"],
-                agent_id=agent_engine["agent_id"],
+                agent_id=cast("str", agent_engine["agent_id"]),
             )
         if isinstance(agent_engine, AgentEngine):
             return agent_engine
@@ -88,19 +93,22 @@ class Agent(BaseModel):
         if self.description_embedding is None and self.description is not None:
             embedding = generate_embeddings(self.description)
             self.description_embedding = cast(
-                list[float],
+                "list[float]",
                 embedding.tolist() if hasattr(embedding, "tolist") else list(embedding),
             )
         return self
 
-    @observe(name="run_agent")
+    @_observe_typed(name="run_agent")
     async def run(
         self,
         input_data: BaseModel,
         master_agent_id: str,
         forge_cycle_id: str | None = None,
-        **kwargs: dict[str, any],
-    ) -> any:
+        **kwargs: dict[str, Any],
+    ) -> BaseModel:
+        if self.agent_engine is None:
+            msg = "Agent engine is not configured"
+            raise RuntimeError(msg)
         return await self.agent_engine.run(
             input_data,
             master_agent_id,
@@ -113,6 +121,9 @@ class Agent(BaseModel):
         agent_input_model: type[BaseModel] | None = None,
         agent_output_model: type[BaseModel] | None = None,
     ) -> None:
+        if self.agent_engine is None:
+            msg = "Agent engine is not configured"
+            raise RuntimeError(msg)
         if agent_input_model is not None:
             self.agent_engine.input_model = agent_input_model
         if agent_output_model is not None:
