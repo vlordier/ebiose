@@ -9,25 +9,56 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from ebiose.core.engines.graph_engine.nodes.agent_node import AgentNode
-from langgraph.runtime import Runtime
+
 
 class InputState(BaseModel):
-    pass
+    """Input state model for LangGraph agent nodes."""
+
 
 class OutputState(BaseModel):
-    pass
+    """Output state model for LangGraph agent nodes."""
+
 
 class LangGraphAgentNode(AgentNode):
+    """LangGraph implementation of agent nodes.
+
+    Executes agents using the LangGraph backend, handling state transformation
+    and response processing.
+    """
 
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
-    async def call_node(self, state: InputState, runtime: Runtime[BaseModel]) -> OutputState: # type: ignore  # noqa: PGH003
-        agent_input = self.agent.agent_engine.input_model.model_validate(
-            state.model_dump(),
-        )
-        response = await self.agent.run(agent_input)
+    async def call_node(
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
+        """Execute the agent with the given state.
+
+        Args:
+            state: Input state for the agent.
+            config: Optional configuration override.
+
+        Returns:
+            Dictionary containing the agent response.
+
+        Raises:
+            RuntimeError: If agent engine is not configured.
+
+        """
+        _ = config  # Unused parameter
+        agent_engine = self.agent.agent_engine
+        if agent_engine is None or agent_engine.input_model is None:
+            msg = "Agent engine input model is not configured"
+            raise RuntimeError(msg)
+        state_payload = state.model_dump() if isinstance(state, BaseModel) else state
+        agent_input = agent_engine.input_model.model_validate(state_payload)
+        response = await self.agent.run(agent_input, master_agent_id=self.agent.id)
 
         # TODO(xabier): return also a tool message
-        return response.model_dump()
-
+        if isinstance(response, BaseModel):
+            return response.model_dump()
+        if isinstance(response, dict):
+            return response
+        return {"response": response}

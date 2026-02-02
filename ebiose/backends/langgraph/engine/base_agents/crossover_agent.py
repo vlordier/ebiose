@@ -4,20 +4,32 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
-import uuid
-from pydantic import BaseModel, Field, computed_field
+from __future__ import annotations
 
+from pydantic import BaseModel
+
+from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
+from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
-from ebiose.core.engines.graph_engine.nodes import (
-    get_node_types_docstrings,
-    node_types_names,
-)
 from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
 
 class AgentInput(BaseModel):
+    """Input model for the crossover agent.
+
+    Attributes:
+        forge_description: Description of the problem domain.
+        node_types: List of allowed node types in generated graphs.
+        max_llm_nodes: Maximum number of LLM nodes allowed.
+        parent_configuration1: Configuration of first parent graph.
+        parent_configuration2: Configuration of second parent graph.
+        node_types_description: Optional description of node types.
+
+    """
+
     forge_description: str
     node_types: list = ["StartNode", "LLMNode", "EndNode"]
     max_llm_nodes: int = 10
@@ -26,12 +38,11 @@ class AgentInput(BaseModel):
     node_types_description: str | None = None
 
     # @computed_field
-    # @property
-    # def node_types_description(self) -> str:
-    #     return get_node_types_docstrings(self.node_types)
+
 
 class AgentOutput(Graph):
-    pass
+    """Output model for the crossover agent (a computational graph)."""
+
 
 SHARED_CONTEXT_PROMPT = """As an expert in Machine Learning, deeply immersed in the most
 recent advancements in prompt engineering and the innovative application of LLMs, your
@@ -77,10 +88,20 @@ problem-solving capacity of the offspring graph.\n
 Create the offspring graph now and return it into the same format as its parents.",
 """
 
-def init_crossover_agent(model_endpoint_id: str | None) -> None:
-    from ebiose.core.agent import Agent
-    from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
 
+def init_crossover_agent(model_endpoint_id: str | None) -> Agent:
+    """Initialize a crossover agent for genetic recombination of graphs.
+
+    The crossover agent creates new graphs by combining elements from two parent graphs,
+    following genetic algorithm principles.
+
+    Args:
+        model_endpoint_id: The LLM model endpoint ID to use for the crossover agent.
+
+    Returns:
+        An Agent instance configured as a crossover agent.
+
+    """
     crossover_node = LLMNode(
         id="crossover",
         name="Crossover",
@@ -103,10 +124,14 @@ def init_crossover_agent(model_endpoint_id: str | None) -> None:
     )
 
     graph.add_edge(
-        Edge(start_node_id=crossover_node.id, end_node_id=end_node.id, condition="not_found"),
+        Edge(
+            start_node_id=crossover_node.id,
+            end_node_id=end_node.id,
+            condition="not_found",
+        ),
     )
 
-    agent_id = "agent-e2b8c849-5709-436d-b7eb-0e0d7e580724"
+    agent_id = SystemAgentId.CROSSOVER
 
     agent_engine = LangGraphEngine(
         agent_id=agent_id,
@@ -114,7 +139,7 @@ def init_crossover_agent(model_endpoint_id: str | None) -> None:
         model_endpoint_id=model_endpoint_id,
         input_model=AgentInput,
         output_model=AgentOutput,
-        tags = ["crossover_agent"],
+        tags=["crossover_agent"],
     )
 
     return Agent(

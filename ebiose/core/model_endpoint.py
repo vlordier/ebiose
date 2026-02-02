@@ -6,17 +6,21 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import yaml
 from pydantic import BaseModel, SecretStr
 
 
 class ModelType(Enum):
+    """Model type categories."""
+
     LLM = "LLM"
 
 
 class ModelSize(Enum):
+    """Model size categories used for pricing tiers."""
+
     SMALL = "Small"  # max 3B - 1M input token 10c
     MEDIUM = "Medium"  # max 15B - 1M input token 50c
     LARGE = "Large"  # max 90B - 1M input token 300c
@@ -24,15 +28,10 @@ class ModelSize(Enum):
 
 
 class ModelEndpoint(BaseModel):
+    """Configuration for a single model endpoint."""
+
     endpoint_id: str
     provider: str
-    # model_name: str  # noqa: ERA001
-
-    # description: str # noqa: ERA001
-    # model_type: ModelType # noqa: ERA001
-    # size: ModelSize # noqa: ERA001
-    # token_per_minute_limit: int # noqa: ERA001
-    # request_per_minute_limit: int # noqa: ERA001
 
     # model endpoint config
     api_key: SecretStr | None = None
@@ -42,6 +41,8 @@ class ModelEndpoint(BaseModel):
 
 
 class EbioseAPIConfig(BaseModel):
+    """Configuration for Ebiose cloud API access."""
+
     api_key: SecretStr | None = None
     api_base: str | None = None
 
@@ -53,21 +54,41 @@ DEFAULT_MODEL_ENDPOINTS_PATH = (
 
 
 class ModelEndpoints:
+    """Registry and access helpers for model endpoint configuration."""
+
     _default_agent_endpoint_id: str | None = None
     _default_meta_agent_endpoint_id: str | None = None
     _default_utility_agent_endpoint_id: str | None = None
     _ebiose_api_config: EbioseAPIConfig | None = None
-    _lite_llm: ClassVar[dict[str, str]] = {"use": False, "use_proxy": False}
+    _lite_llm: ClassVar[dict[str, Any]] = {"use": False, "use_proxy": False}
     _endpoints: ClassVar[list[ModelEndpoint]] = []
 
     @staticmethod
     def get_default_model_endpoint_id() -> str:
+        """Get the default agent model endpoint ID.
+
+        Returns:
+            The default agent endpoint ID.
+
+        Raises:
+            ValueError: If default endpoint ID is not set.
+
+        """
         if ModelEndpoints._default_agent_endpoint_id is None:
             ModelEndpoints.load_model_endpoints()
+        if ModelEndpoints._default_agent_endpoint_id is None:
+            msg = "Default agent endpoint ID is not set"
+            raise ValueError(msg)
         return ModelEndpoints._default_agent_endpoint_id
 
     @staticmethod
     def get_default_meta_agent_endpoint_id() -> str:
+        """Get the default meta agent model endpoint ID.
+
+        Returns:
+            The default meta agent endpoint ID, or default agent endpoint ID if not set.
+
+        """
         if ModelEndpoints._default_meta_agent_endpoint_id is None:
             ModelEndpoints.load_model_endpoints()
         if ModelEndpoints._default_meta_agent_endpoint_id is None:
@@ -76,6 +97,12 @@ class ModelEndpoints:
 
     @staticmethod
     def get_default_utility_agent_endpoint_id() -> str:
+        """Get the default utility agent model endpoint ID.
+
+        Returns:
+            The default utility agent endpoint ID, or default agent endpoint ID if not set.
+
+        """
         if ModelEndpoints._default_utility_agent_endpoint_id is None:
             ModelEndpoints.load_model_endpoints()
         if ModelEndpoints._default_utility_agent_endpoint_id is None:
@@ -84,14 +111,29 @@ class ModelEndpoints:
 
     @staticmethod
     def get_ebiose_api_key() -> str | None:
+        """Get the Ebiose API key from configuration.
+
+        Returns:
+            The API key if configured, None otherwise.
+
+        """
         if ModelEndpoints._ebiose_api_config is None:
             ModelEndpoints.load_model_endpoints()
-        if ModelEndpoints._ebiose_api_config is not None:
+        if (
+            ModelEndpoints._ebiose_api_config is not None
+            and ModelEndpoints._ebiose_api_config.api_key is not None
+        ):
             return ModelEndpoints._ebiose_api_config.api_key.get_secret_value()
         return None
 
     @staticmethod
     def get_ebiose_api_base() -> str | None:
+        """Get the Ebiose API base URL from configuration.
+
+        Returns:
+            The API base URL if configured, None otherwise.
+
+        """
         if ModelEndpoints._ebiose_api_config is None:
             ModelEndpoints.load_model_endpoints()
         if ModelEndpoints._ebiose_api_config is not None:
@@ -100,18 +142,52 @@ class ModelEndpoints:
 
     @staticmethod
     def use_lite_llm() -> bool:
-        return ModelEndpoints._lite_llm["use"]
+        """Check if LiteLLM is enabled.
+
+        Returns:
+            True if LiteLLM is enabled, False otherwise.
+
+        """
+        return bool(ModelEndpoints._lite_llm["use"])
 
     @staticmethod
     def use_lite_llm_proxy() -> bool:
-        return ModelEndpoints._lite_llm["use_proxy"]
+        """Check if LiteLLM proxy is enabled.
+
+        Returns:
+            True if LiteLLM proxy is enabled, False otherwise.
+
+        """
+        return bool(ModelEndpoints._lite_llm["use_proxy"])
 
     @staticmethod
     def get_lite_llm_config() -> tuple[str, str]:
-        return ModelEndpoints._lite_llm["api_key"], ModelEndpoints._lite_llm["api_base"]
+        """Get LiteLLM configuration (API key and base URL).
+
+        Returns:
+            Tuple of (api_key, api_base).
+
+        """
+        api_key = ModelEndpoints._lite_llm["api_key"]
+        api_base = ModelEndpoints._lite_llm["api_base"]
+        return str(api_key) if api_key is not None else "", str(
+            api_base
+        ) if api_base is not None else ""
 
     @staticmethod
     def load_model_endpoints(file_path: str | None = None) -> list[ModelEndpoint]:
+        """Load model endpoints from YAML configuration file.
+
+        Args:
+            file_path: Path to the model_endpoints.yml file. If None, uses the default path.
+
+        Returns:
+            List of loaded ModelEndpoint configurations.
+
+        Raises:
+            ValueError: If no default agent endpoint ID is found in the configuration.
+
+        """
         if file_path is None:
             file_path = str(DEFAULT_MODEL_ENDPOINTS_PATH)
         full_path = Path(file_path)
@@ -166,6 +242,16 @@ class ModelEndpoints:
         model_endpoint_id: str,
         file_path: str | None = None,
     ) -> ModelEndpoint | None:
+        """Get a specific model endpoint by ID.
+
+        Args:
+            model_endpoint_id: The ID of the endpoint to retrieve.
+            file_path: Optional path to the model endpoints configuration file.
+
+        Returns:
+            The ModelEndpoint if found, None otherwise.
+
+        """
         if len(ModelEndpoints._endpoints) == 0:
             ModelEndpoints.load_model_endpoints(file_path)
         for endpoint in ModelEndpoints._endpoints:
@@ -175,6 +261,15 @@ class ModelEndpoints:
 
     @staticmethod
     def get_all_model_endpoints(file_path: str | None = None) -> list[ModelEndpoint]:
+        """Get all configured model endpoints.
+
+        Args:
+            file_path: Optional path to the model endpoints configuration file.
+
+        Returns:
+            List of all available ModelEndpoint configurations.
+
+        """
         if len(ModelEndpoints._endpoints) == 0:
             ModelEndpoints.load_model_endpoints(file_path)
         return ModelEndpoints._endpoints

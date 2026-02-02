@@ -4,21 +4,32 @@ Pre-release Version - DO NOT DISTRIBUTE
 This software is licensed under the MIT License. See LICENSE for details.
 """
 
-import random
-import uuid
+from __future__ import annotations
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel
 
+from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
+from ebiose.backends.langgraph.engine.llm_node import LangGraphLLMNode
+from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
-from ebiose.core.engines.graph_engine.nodes import (
-    get_node_types_docstrings,
-)
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
 
 class AgentInput(BaseModel):
+    """Input model for the architect agent.
+
+    Attributes:
+        forge_description: Description of the forge/problem domain.
+        node_types: List of node types allowed in the generated graph.
+        max_llm_nodes: Maximum number of LLM nodes in the generated graph.
+        random_n_llm_nodes: Whether to randomly determine the number of LLM nodes.
+        node_types_description: Optional description of available node types.
+        n_llm_nodes_constraint_string: Constraint string for LLM node count.
+
+    """
+
     forge_description: str
     node_types: list = ["StartNode", "LLMNode", "EndNode"]
     max_llm_nodes: int = 10
@@ -26,33 +37,9 @@ class AgentInput(BaseModel):
     node_types_description: str | None = None
     n_llm_nodes_constraint_string: str | None = None
 
-    # @computed_field
-    # @property
-    # def _node_types_description(self) -> str:
-    #     return get_node_types_docstrings(self.node_types)
-
-    # @computed_field
-    # @property
-    # def n_llm_nodes_constraint_string(self) -> str:
-    #     if self.random_n_llm_nodes:
-    #             return f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, self.max_llm_nodes)} exactly."
-    #     return f"Be careful : Do not exceed {self.max_llm_nodes} LLM nodes in the graph."
-
-    # def __init__(self, **data):
-    #     super().__init__(**data)
-    #     self._compute_derived_fields()
-
-    # def _compute_derived_fields(self):
-    #     """Helper method to compute the fields."""
-    #     self.node_types_description = get_node_types_docstrings(self.node_types)
-    #     if self.random_n_llm_nodes:
-    #         self.n_llm_nodes_constraint_string = f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, self.max_llm_nodes)} exactly."
-    #     else:
-    #         self.n_llm_nodes_constraint_string = f"Be careful : Do not exceed {self.max_llm_nodes} LLM nodes in the graph."
-
 
 class AgentOutput(Graph):
-    pass
+    """Output model for the architect agent (a computational graph)."""
 
 
 SHARED_CONTEXT_PROMPT = """As an expert in Machine Learning, deeply immersed in the
@@ -137,91 +124,107 @@ entire graph with the prompts under the following format:\n
 
 
 def init_architect_agent(
-        model_endpoint_id: str | None,
-        add_format_node: bool = True,  # noqa: FBT001, FBT002
-    ) -> None:
-        from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
-        from ebiose.core.agent import Agent
+    model_endpoint_id: str | None,
+    **kwargs: bool | str | int,
+) -> Agent:
+    """Initialize an architect agent for designing graph architectures.
 
-        graph_outline_generation_node = LLMNode(
-            id="graph_outline_generation",
-            name="Graph Outline Generation",
-            purpose="Step 1: Generate the outline of the graph",
-            prompt=GRAPH_OUTLINE_GENERATION_PROMPT,
-            temperature=0.7,
+    The architect agent is responsible for generating and designing computational graphs
+    that solve problems. It creates the structure of nodes and edges based on a task description.
+
+    Args:
+        model_endpoint_id: The LLM model endpoint ID to use for the architect agent.
+        **kwargs: Additional configuration options for the agent.
+
+    Returns:
+        An Agent instance configured as an architect agent.
+
+    """
+    add_format_node = kwargs.get("add_format_node", True)
+
+    graph_outline_generation_node = LangGraphLLMNode(
+        id="graph_outline_generation",
+        name="Graph Outline Generation",
+        purpose="Step 1: Generate the outline of the graph",
+        prompt=GRAPH_OUTLINE_GENERATION_PROMPT,
+        temperature=0.7,
+    )
+
+    prompt_generation_prompt = PROMPT_GENERATION_PROMPT
+    if add_format_node:
+        prompt_generation_prompt += "Generate the prompts now for each LLM node."
+    else:
+        prompt_generation_prompt += "Generate the prompts and return the whole graph with prompts under the following format: \n {output_schema}"
+
+    prompt_generation_node = LangGraphLLMNode(
+        id="prompt_generation",
+        name="Prompt Generation",
+        purpose="Step 2: Generate the prompts for each LLM node",
+        prompt=prompt_generation_prompt,
+        temperature=0.7,
+    )
+
+    format_node: LangGraphLLMNode | None = None
+    if add_format_node:
+        format_node = LangGraphLLMNode(
+            id="format",
+            name="Format",
+            purpose="Step 3: Format the entire graph with the prompts",
+            prompt=FORMAT_PROMPT,
+            temperature=0.0,
+            tools=[AgentOutput],
         )
 
-        prompt_generation_prompt = PROMPT_GENERATION_PROMPT
-        if add_format_node:
-            prompt_generation_prompt += "Generate the prompts now for each LLM node."
-        else:
-            prompt_generation_prompt += "Generate the prompts and return the whole graph with prompts under the following format: \n {output_schema}"
+    start_node = StartNode()
+    end_node = EndNode()
 
-        prompt_generation_node = LLMNode(
-            id="prompt_generation",
-            name="Prompt Generation",
-            purpose="Step 2: Generate the prompts for each LLM node",
-            prompt=prompt_generation_prompt,
-            temperature=0.7,
-        )
+    graph = Graph(shared_context_prompt=SHARED_CONTEXT_PROMPT)
 
-        if add_format_node:
-            format_node = LLMNode(
-                id="format",
-                name="Format",
-                purpose="Step 3: Format the entire graph with the prompts",
-                prompt=FORMAT_PROMPT,
-                temperature=0,
-                tools=[AgentOutput],
-            )
+    graph.add_node(start_node)
+    graph.add_node(graph_outline_generation_node)
+    graph.add_node(prompt_generation_node)
+    graph.add_node(end_node)
+    if add_format_node and format_node is not None:
+        graph.add_node(format_node)
 
-        start_node = StartNode()
-        end_node = EndNode()
+    graph.add_edge(
+        Edge(start_node_id=start_node.id, end_node_id=graph_outline_generation_node.id),
+    )
 
-        graph = Graph(shared_context_prompt=SHARED_CONTEXT_PROMPT)
+    graph.add_edge(
+        Edge(
+            start_node_id=graph_outline_generation_node.id,
+            end_node_id=prompt_generation_node.id,
+        ),
+    )
 
-        graph.add_node(start_node)
-        graph.add_node(graph_outline_generation_node)
-        graph.add_node(prompt_generation_node)
-        graph.add_node(end_node)
-        if add_format_node:
-            graph.add_node(format_node)
-
+    if not add_format_node or format_node is None:
         graph.add_edge(
-            Edge(start_node_id=start_node.id, end_node_id=graph_outline_generation_node.id),
+            Edge(start_node_id=prompt_generation_node.id, end_node_id=end_node.id),
         )
-
+    else:
         graph.add_edge(
-            Edge(start_node_id=graph_outline_generation_node.id, end_node_id=prompt_generation_node.id),
+            Edge(start_node_id=prompt_generation_node.id, end_node_id=format_node.id),
+        )
+        graph.add_edge(
+            Edge(start_node_id=format_node.id, end_node_id=end_node.id),
         )
 
-        if not add_format_node:
-            graph.add_edge(
-                Edge(start_node_id=prompt_generation_node.id, end_node_id=end_node.id),
-            )
-        else:
-            graph.add_edge(
-                Edge(start_node_id=prompt_generation_node.id, end_node_id=format_node.id),
-            )
-            graph.add_edge(
-                Edge(start_node_id=format_node.id, end_node_id=end_node.id),
-            )
+    agent_id = SystemAgentId.ARCHITECT
 
-        agent_id = "agent-54c2124d-a473-43e6-ae1c-24a217ff7607"
+    agent_engine = LangGraphEngine(
+        agent_id=agent_id,
+        graph=graph,
+        model_endpoint_id=model_endpoint_id,
+        input_model=AgentInput,
+        output_model=AgentOutput,
+        tags=["architect_agent"],
+    )
 
-        agent_engine = LangGraphEngine(
-            agent_id=agent_id,
-            graph=graph,
-            model_endpoint_id=model_endpoint_id,
-            input_model=AgentInput,
-            output_model=AgentOutput,
-            tags = ["architect_agent"],
-        )
-
-        return Agent(
-            id=agent_id,
-            name="architect_agent",
-            agent_type="architect",
-            description="Architect agent that generate agents",
-            agent_engine=agent_engine,
-        )
+    return Agent(
+        id=agent_id,
+        name="architect_agent",
+        agent_type="architect",
+        description="Architect agent that generate agents",
+        agent_engine=agent_engine,
+    )

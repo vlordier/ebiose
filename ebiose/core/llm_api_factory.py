@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
+
 if TYPE_CHECKING:
     from ebiose.core.llm_api import LLMApi, LLMAPIConfig
 
@@ -18,11 +20,15 @@ class LLMApiFactory:
     @classmethod
     def initialize(
         cls,
-        mode: Literal["local", "cloud"], 
-        lite_llm_api_key: str | None = None, 
+        mode: Literal["local", "cloud"],
+        lite_llm_api_key: str | None = None,
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
-    ) -> LLMApi:
+    ) -> type[LLMApi]:
         """Initialize the LLM API and return the instance."""
-        from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
-        return LangGraphLLMApi.initialize(mode, lite_llm_api_key, lite_llm_api_base, llm_api_config)
+        return LangGraphLLMApi.initialize(
+            mode,
+            lite_llm_api_key,
+            lite_llm_api_base,
+            llm_api_config,
+        )

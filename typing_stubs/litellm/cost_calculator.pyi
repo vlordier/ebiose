@@ -1,0 +1,3 @@
+from typing import Any
+
+def cost_per_token(*args: Any, **kwargs: Any) -> tuple[float, float]: ...

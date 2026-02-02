@@ -12,4 +12,10 @@ from ebiose.core.engines.graph_engine.nodes.node import BaseNode
 
 
 class PydanticValidatorNode(BaseNode):
+    """Validates state against Pydantic models.
+
+    The PydanticValidatorNode is used to validate the state at a specific point in
+    the graph execution against a Pydantic model, ensuring data integrity and correctness.
+    """
+
     type: Literal["PydanticValidatorNode"] = "PydanticValidatorNode"

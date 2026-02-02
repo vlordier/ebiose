@@ -1,3 +1,5 @@
+"""Event models and logging utilities for forge cycle execution."""
+
 from __future__ import annotations
 
 import datetime
@@ -5,7 +7,11 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import loguru
 from loguru import logger as _logger
+
+if TYPE_CHECKING:
+    from loguru import Message
 from pydantic import BaseModel, Field, computed_field
 
 from ebiose.cloud_client.ebiose_api_client import EbioseAPIClient
@@ -45,11 +51,14 @@ class SelectionMethod(Enum):
 event_logger = _logger
 
 
-def elastic_sink(message) -> None:  # noqa: ANN001
+def elastic_sink(message: Message) -> None:
+    """Send structured log records to the Ebiose cloud logging endpoint."""
     record = message.record
-    record_extra = record.pop("extra", {})
-    event_payload = record_extra.pop("event_payload", None)
-    log_doc = record_extra
+    record_extra = record.get("extra", {})
+    event_payload = (
+        record_extra.get("event_payload") if isinstance(record_extra, dict) else None
+    )
+    log_doc = dict(record_extra) if isinstance(record_extra, dict) else {}
     if event_payload is not None:
         log_doc.update(event_payload)
     log_doc["loguru"] = {
@@ -77,9 +86,9 @@ def init_logger(
     forge_id: str | UUID | None,
     forge_cycle_id: str | UUID,
     initial_budget: float | None = None,
-) -> None:
-    global event_logger
-    event_logger = event_logger.bind(
+) -> loguru.Logger:
+    """Initialize and return a bound logger with context."""
+    return event_logger.bind(
         user_id=user_id,
         forge_id=forge_id,
         forge_cycle_id=forge_cycle_id,
@@ -101,12 +110,11 @@ class BaseEvent(BaseModel):
     )
 
     @computed_field
-    @property
     def event_name(self) -> str:
+        """Return the event class name for logging and serialization."""
         return self.__class__.__name__
 
     @computed_field
-    @property
     def budget_usage_ratio(self) -> float | None:
         """Calculate the ratio of remaining budget to initial budget (0.0 to 1.0)."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -116,7 +124,6 @@ class BaseEvent(BaseModel):
         return self.remaining_budget / self.initial_budget
 
     @computed_field
-    @property
     def budget_spent_ratio(self) -> float | None:
         """Calculate the ratio of spent budget to initial budget (0.0 to 1.0)."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -126,7 +133,6 @@ class BaseEvent(BaseModel):
         return (self.initial_budget - self.remaining_budget) / self.initial_budget
 
     @computed_field
-    @property
     def budget_spent(self) -> float | None:
         """Calculate the amount of budget spent."""
         if self.initial_budget is None or self.remaining_budget is None:
@@ -134,10 +140,11 @@ class BaseEvent(BaseModel):
         return self.initial_budget - self.remaining_budget
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the event to a JSON-compatible dictionary."""
         return self.model_dump(mode="json")
 
     def log(self, message_override: str | None = None) -> None:
-        """Logs this event using Loguru.
+        """Log this event using Loguru.
 
         The event data is bound to the log record for consumption by structured logging sinks.
         """
@@ -197,7 +204,7 @@ class PopulationInitializationStartedEvent(BaseEvent):
 
     n_agents_to_initialize: int
     n_selected_from_ecosystem: int
-    generation_number: int = Field(
+    generation_number: int | None = Field(
         default=0,
         description="Always 0 during initialization",
     )
@@ -223,7 +230,7 @@ class PopulationInitializationCompletedEvent(BaseEvent):
     num_agents_initialized: int
     initialization_cost: float
     duration_seconds: float
-    generation_number: int = Field(
+    generation_number: int | None = Field(
         default=0,
         description="Always 0 during initialization",
     )

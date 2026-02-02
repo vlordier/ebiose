@@ -1,25 +1,34 @@
+"""Graph node implementations.
+
+Provides different node types for building computational graphs,
+including LLM nodes, code execution nodes, routing nodes, and more.
+"""
+
 import importlib
-from functools import reduce
 import random
+from functools import reduce
+from typing import Any
 
-from pydantic import BaseModel
-
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode  # noqa: F401
-from ebiose.core.engines.graph_engine.nodes.node import (  # noqa: F401
-    BaseNode,
-    EndNode,
-    StartNode,
-)
+from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
+from ebiose.core.engines.graph_engine.nodes.node import BaseNode, EndNode, StartNode
 from ebiose.core.engines.graph_engine.nodes.pydantic_validator_node import (
-    PydanticValidatorNode,  # noqa: F401
+    PydanticValidatorNode,
 )
-from ebiose.core.engines.graph_engine.nodes.routing_node import (
-    RoutingNode,  # noqa: F401
-)
+from ebiose.core.engines.graph_engine.nodes.routing_node import RoutingNode
+
+__all__ = [
+    "BaseNode",
+    "EndNode",
+    "LLMNode",
+    "PydanticValidatorNode",
+    "RoutingNode",
+    "StartNode",
+    "get_all_subclasses",
+]
 
 
-def get_all_subclasses(cls: BaseModel) -> list:
-    """This function get all subclasses of a class recursively.
+def get_all_subclasses(cls: type) -> list[type]:
+    """Get all subclasses of a class recursively.
 
     Its purpose is to provide the Union type representing all node types, in use in the Graph class.
     """
@@ -46,8 +55,12 @@ node_types_map = {node_type.__name__: node_type for node_type in node_types}
 if BaseNode in node_types:
     node_types.remove(BaseNode)
 
+
 # Create the NodeTypes union from the node types list
-NodeTypes = reduce(lambda acc, t: acc | t, node_types)
+# This creates a union type dynamically at runtime for all node subclasses
+# The reduce operation creates a union type, which mypy cannot properly type
+NodeTypes: Any = reduce(lambda acc, t: acc | t, node_types)  # type: ignore[arg-type, return-value]
+
 
 def get_node_types_docstrings(node_types_names: list) -> str:
     """Get the docstring of each node type to pass in the prompts."""
@@ -60,7 +73,12 @@ def get_node_types_docstrings(node_types_names: list) -> str:
                 docstrings_list.append(f"**{node_type_name}**:\n{docstring}\n")
     return "\n".join(docstrings_list)
 
-def get_n_llm_nodes_constraint_string(random_n_llm_nodes: bool, max_llm_nodes: int) -> str:  # noqa: FBT001
+
+def get_n_llm_nodes_constraint_string(
+    *,
+    random_n_llm_nodes: bool,
+    max_llm_nodes: int,
+) -> str:
     """Get the constraint string for the number of LLM nodes in the graph."""
     if random_n_llm_nodes:
         return f"Be careful : The number of LLM nodes in the graph must be of {random.randint(1, max_llm_nodes)} exactly."

@@ -6,7 +6,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from typing import Literal, LiteralString, Self
+from typing import TYPE_CHECKING, Any, Literal, LiteralString, Self, cast
 
 from pydantic import (
     BaseModel,
@@ -18,9 +18,11 @@ from pydantic import (
     model_validator,
 )
 
-from ebiose.core.engines.graph_engine.edge import Edge
-from ebiose.core.engines.graph_engine.nodes import NodeTypes, node_types_map
+from ebiose.core.engines.graph_engine.nodes import node_types_map
 from ebiose.core.engines.graph_engine.nodes.node import BaseNode, EndNode
+
+if TYPE_CHECKING:
+    from ebiose.core.engines.graph_engine.edge import Edge
 
 
 class Graph(BaseModel):
@@ -47,7 +49,7 @@ class Graph(BaseModel):
         default_factory=list,
         description="list of edges in the graph",
     )
-    nodes: list[NodeTypes] = Field(
+    nodes: list[BaseNode] = Field(
         default_factory=list,
         description="list of nodes in the graph",
     )
@@ -58,7 +60,7 @@ class Graph(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @model_validator(mode="after")
-    def validate_graph(self, info: ValidationInfo) -> Graph:  # noqa: ARG002
+    def validate_graph(self, _info: ValidationInfo) -> Graph:
         """Validate the graph by checking placeholders and outgoing conditional edges."""
         msg = ""
 
@@ -66,8 +68,11 @@ class Graph(BaseModel):
         msg += self.__validate_outgoing_conditional_edges()
 
         # check edges and nodes
-        node_ids = {node.id for node in self.nodes}
-        node_ids_in_edges = set([edge.start_node_id for edge in self.edges] + [edge.end_node_id for edge in self.edges])
+        node_ids = {getattr(node, "id", str(node)) for node in self.nodes}
+        node_ids_in_edges = set(
+            [edge.start_node_id for edge in self.edges]
+            + [edge.end_node_id for edge in self.edges],
+        )
 
         # add a message for nodes that are not in the edges
         for node_id in node_ids - node_ids_in_edges:
@@ -109,16 +114,16 @@ class Graph(BaseModel):
                 if edge.start_node_id == node.id and edge.is_conditional()
             ]
             outgoing_edges = [
-                edge
-                for edge in self.edges
-                if edge.start_node_id == node.id
+                edge for edge in self.edges if edge.start_node_id == node.id
             ]
             if len(conditional_outgoing_edges) == 1 and len(outgoing_edges) == 1:
                 # if node has a unique edge which is conditional, remove condition
                 for edge in self.edges:
                     if edge.start_node_id == node.id:
                         edge.condition = None
-            elif len(conditional_outgoing_edges)>0 and len(conditional_outgoing_edges) != len(outgoing_edges):
+            elif len(conditional_outgoing_edges) > 0 and len(
+                conditional_outgoing_edges,
+            ) != len(outgoing_edges):
                 # if node has several edges but not all are conditional
                 nodes_with_errors.append(node.id)
 
@@ -130,12 +135,10 @@ class Graph(BaseModel):
 
     @field_validator("nodes", mode="before")
     @classmethod
-    def validate_nodes(cls, nodes: any) -> list[NodeTypes]:
+    def validate_nodes(
+        cls, nodes: list[dict[str, Any]] | list[BaseNode]
+    ) -> list[BaseNode]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
-        if not isinstance(nodes, list):
-            msg = "Field 'nodes' should be a list"
-            raise TypeError(msg)
-
         if len(nodes) == 0:
             msg = "Field 'nodes' cannot be empty."
             raise ValueError(msg)
@@ -151,20 +154,16 @@ class Graph(BaseModel):
 
     @field_validator("edges", mode="before")
     @classmethod
-    def validate_edges(cls, edges: any) -> list[Edge]:
+    def validate_edges(cls, edges: list[dict[str, Any]] | list[Edge]) -> list[Edge]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
-        if not isinstance(edges, list):
-            msg = "Field 'edges' should be a list"
-            raise TypeError(msg)
-
         if len(edges) == 0:
             msg = "Field 'edges' cannot be empty."
             raise ValueError(msg)
 
-        return edges
+        return cast("list[Edge]", edges)
 
     @classmethod
-    def __validate_nodes(cls, nodes: list[dict]) -> tuple[list, list] | None:
+    def __validate_nodes(cls, nodes: list[Any]) -> tuple[list, list]:
         validated_nodes = []
         errors = []
 
@@ -182,6 +181,7 @@ class Graph(BaseModel):
                         },
                     },
                 )
+                continue
 
             # turn int id into str
             if "id" in node and isinstance(node["id"], int):
@@ -216,22 +216,23 @@ class Graph(BaseModel):
                 continue
 
             try:
+                node_class = cast("type[BaseModel]", node_types_map[node_type])
                 validated_nodes.append(
-                    node_types_map[node_type].model_validate(node),
+                    node_class.model_validate(node),
                 )
             except ValidationError as e:
                 for error in e.errors():
-                    error["loc"] = (index,) + error["loc"]
-                    errors.append(error)
+                    error_dict = dict(error)  # Convert ErrorDetails to dict
+                    errors.append(error_dict)
 
         return errors, validated_nodes
-
 
     def add_edge(self: Self, edge: Edge) -> None:
         """Add an edge to the graph.
 
         Args:
                 edge: An instance of the Edge class
+
         """
         self.edges.append(edge)
 
@@ -240,6 +241,7 @@ class Graph(BaseModel):
 
         Args:
                 node: An instance of the Node class
+
         """
         # TODO(xabier): Improve performance
         # https://github.com/ebiose-ai/ebiose/issues/43
@@ -256,6 +258,7 @@ class Graph(BaseModel):
 
         Returns:
                 The node with the given id
+
         """
         # TODO(xabeir): Improve performance
         # https://github.com/ebiose-ai/ebiose/issues/43
@@ -265,11 +268,12 @@ class Graph(BaseModel):
         msg = f"Node with id {node_id} not found in the graph"
         raise ValueError(msg)
 
-    def get_last_node_ids(self: Self) -> list[BaseNode]:
+    def get_last_node_ids(self: Self) -> list[str]:
         """Get the ids of the last nodes in the graph.
 
         Returns:
                 A list of ids of the nodes that have the EndNode as outgoing edges
+
         """
         return [
             edge.start_node_id
@@ -280,6 +284,7 @@ class Graph(BaseModel):
     def get_outgoing_nodes(
         self: Self,
         node_id: str,
+        *,
         conditional: bool | None = None,
     ) -> list[BaseNode]:
         """Get the outgoing nodes of a node. By default, return all nodes connected to the node.
@@ -290,6 +295,7 @@ class Graph(BaseModel):
 
         Returns:
                 A list of nodes that are connected to the node
+
         """
         if conditional is None:
             return [
@@ -317,13 +323,14 @@ class Graph(BaseModel):
         """
         for node in self.nodes:
             if isinstance(node, EndNode):
-                return node.id
+                return str(node.id)
         msg = "End node not found in the graph"
         raise ValueError(msg)
 
     def get_outgoing_edges(
         self: Self,
         node_id: str,
+        *,
         conditional: bool | None = None,
     ) -> list[Edge]:
         """Get the outgoing edges of a node. By default, return all edges connected to the node.
@@ -365,6 +372,7 @@ class Graph(BaseModel):
 
         Args:
                                 orientation: The orientation of the graph.
+
         """
         node_type_display_name = {
             "LLMNode": "({node_name})",
@@ -385,18 +393,21 @@ class Graph(BaseModel):
 
             # Determine the appropriate brackets for the node type
             start_node_block = node_type_display_name.get(
-                start_node.type,
+                start_node.__class__.__name__,
                 "[/{node_name}/]",
             ).format(node_name=start_node_name)
             end_node_block = node_type_display_name.get(
-                end_node.type,
+                end_node.__class__.__name__,
                 "[/{node_name}/]",
             ).format(node_name=end_node_name)
 
-            if edge.is_conditional():
+            if edge.is_conditional() and edge.condition is not None:
                 # replace the [ with #91; and ] with #93; to avoid mermaid syntax error
                 condition = edge.condition.replace("[", "#91;").replace("]", "#93;")
                 mermaid_str += f"\t{start_node_id}{start_node_block} -->|{condition}| {end_node_id}{end_node_block}\n"
+            elif edge.is_conditional():
+                # Fallback for conditional edges with None condition
+                mermaid_str += f"\t{start_node_id}{start_node_block} -->|true| {end_node_id}{end_node_block}\n"
             else:
                 mermaid_str += f"\t{start_node_id}{start_node_block} --> {end_node_id}{end_node_block}\n"
 

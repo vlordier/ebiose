@@ -18,6 +18,7 @@ class BaseNode(BaseModel):
     Attributes:
         id: The identifier of the node
         type: The type of the node
+
     """
 
     id: str
@@ -25,8 +26,13 @@ class BaseNode(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @abstractmethod  # Must be implemented
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
-        pass
+    async def call_node(
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
+        """Execute the node and return the updated state payload."""
+        return {}
 
 
 class StartNode(BaseNode):
@@ -39,14 +45,30 @@ class StartNode(BaseNode):
     Attributes:
     id: The identifier of the node
     type: The type of the node which is StartNode
+
     """
 
     id: str = Field(default="start_node")
     name: str = Field(default="start_node")
     type: Literal["StartNode"] = "StartNode"
 
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
-        pass
+    async def call_node(
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
+        """Return an empty payload for the start node.
+
+        Args:
+            state: Input state (unused).
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Empty dictionary.
+
+        """
+        _ = state, config  # Unused parameters
+        return {}
 
 
 class EndNode(BaseNode):
@@ -67,5 +89,20 @@ class EndNode(BaseNode):
     name: str = Field(default="end_node")
     type: Literal["EndNode"] = "EndNode"
 
-    async def call_node(self, state: BaseModel | dict, config: BaseModel | None = None) -> dict:
-        pass
+    async def call_node(
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
+        """Return an empty payload for the end node.
+
+        Args:
+            state: Input state (unused).
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Empty dictionary.
+
+        """
+        _ = state, config  # Unused parameters
+        return {}

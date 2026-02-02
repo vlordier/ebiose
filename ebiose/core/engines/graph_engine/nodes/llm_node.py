@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import abc
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -41,13 +41,19 @@ class LLMNode(BaseNode, abc.ABC):
         ...,
         description="The prompt used to generate the output of the model",
     )
+    temperature: float | None = None
+    tools: list[Any] | None = None
     # TODO(xabier): which others fields should be generated here? llm_model, temperature, etc.
 
     # TODO(xabier):  abstract class
     # https://github.com/ebiose-ai/ebiose/issues/44
 
-    async def call_node(self, agent_state: BaseModel | dict, config: BaseModel | None = None) -> dict:
-        """Basic call_node where there is only a common prompt in the graph and a list of messages where there are additively stacked."""
+    async def call_node(
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
+    ) -> dict:
+        """Run a basic call_node where there is only a common prompt in the graph and a list of messages where there are additively stacked."""
         msg = "This method depends on the backend used to call the LLM model"
         raise NotImplementedError(
             msg,

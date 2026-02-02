@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Install pre-commit
+      run: uv pip install pre-commit
+
+    - name: Run pre-commit hooks
+      run: uv run pre-commit run --all-files
+
+    - name: Run ruff formatter
+      run: uv run ruff format .
+
+    - name: Run ruff linter
+      run: uv run ruff check --fix .
+
+    - name: Run mypy type checking
+      run: uv run mypy . || true  # Optional: type checking is nice to have
+
+    - name: Lint YAML files
+      continue-on-error: true  # Optional: system package install may fail due to PEP 668
+      run: |
+        uv run pip install yamllint || true
+        uv run yamllint . --exclude="notebooks/" || true
+
+    - name: Lint Docker files
+      continue-on-error: true  # Optional
+      run: |
+        if [ -f Dockerfile ]; then
+          uv run pip install hadolint || true
+          uv run hadolint Dockerfile || true
+        fi
+
+    - name: Lint Makefiles
+      run: |
+        if [ -f Makefile ]; then
+          echo "Makefile linting would go here"
+        fi
+
+    - name: Run tests with coverage
+      run: uv run pytest --cov=ebiose --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Build documentation
+      run: uv run mkdocs build
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation
+        path: site/
+        if-no-files-found: ignore

@@ -1,0 +1,6 @@
+from typing import Any
+
+class Markdown:
+    def __init__(self, data: Any) -> None: ...
+
+def display(*args: Any, **kwargs: Any) -> None: ...

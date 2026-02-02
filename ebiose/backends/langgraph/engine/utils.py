@@ -6,15 +6,18 @@ This software is licensed under the MIT License. See LICENSE for details.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from pydantic import BaseModel  # noqa: TC002
-
-from ebiose.core.engines.graph_engine.utils import GraphUtils
-from langgraph.runtime import Runtime
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
+    from langgraph.runtime import Runtime
+    from pydantic import BaseModel
+
+
+from ebiose.core.engines.graph_engine.utils import GraphUtils
+
+if TYPE_CHECKING:
     from ebiose.core.engines.graph_engine.edge import Edge
 
 from langgraph.graph import END
@@ -40,12 +43,28 @@ class EdgeConditionError(ValueError):
     """Exception raised when the condition is not found in the edge."""
 
     def __init__(self, condition: str) -> None:
+        """Initialize the error for a missing routing condition.
+
+        Args:
+            condition: The condition that could not be matched.
+
+        """
         message = f"No edge found with the condition {condition}."
         super().__init__(message)
 
 
+class RoutingState(Protocol):
+    """Protocol for routing state used in conditional edge selection."""
 
-def get_path(conditional_edges: list[Edge], end_node_id: str) -> callable:
+    condition: str | None
+    messages: list[Any]
+    model_fields: dict[str, Any]
+
+
+def get_path(
+    conditional_edges: list[Edge],
+    end_node_id: str,
+) -> tuple[Callable[[RoutingState, Runtime[BaseModel]], Awaitable[str]], list[str]]:
     """Decide in which node to go next depending on the condition.
 
     Args:
@@ -54,25 +73,35 @@ def get_path(conditional_edges: list[Edge], end_node_id: str) -> callable:
 
     Returns:
         callable: Function to determine the next node.
+
     """
-    start_node_id = {edge.start_node_id for edge in conditional_edges}
-    if len(start_node_id) > 1:
-        raise NodesCoherenceError(start_node_id)
-    start_node_id = start_node_id.pop()
+    start_node_ids = {edge.start_node_id for edge in conditional_edges}
+    if len(start_node_ids) > 1:
+        raise NodesCoherenceError(start_node_ids)
+    start_node_id = start_node_ids.pop()
 
-    async def path(state: BaseModel, runtime: Runtime[BaseModel]) -> str:
-
+    async def path(state: RoutingState, runtime: Runtime[BaseModel]) -> str:
         condition = None
-        if "condition" in state.model_fields and state.condition is not None and len(state.condition) > 0:
+        if (
+            "condition" in state.model_fields
+            and state.condition is not None
+            and len(state.condition) > 0
+        ):
             condition = state.condition
         else:
             # call the routing agent
-            model_endpoint_id = runtime.context.model_endpoint_id
+            if runtime.context is None:
+                msg = "Runtime context is missing"
+                raise RuntimeError(msg)
             master_agent_id = runtime.context.agent_id
             forge_cycle_id = runtime.context.forge_cycle_id
 
             routing_agent = GraphUtils.get_routing_agent()
-            routing_agent_input = routing_agent.agent_engine.input_model(
+            routing_engine = routing_agent.agent_engine
+            if routing_engine is None or routing_engine.input_model is None:
+                msg = "Routing agent engine is not configured"
+                raise RuntimeError(msg)
+            routing_agent_input = routing_engine.input_model(
                 last_message=state.messages[-1],
                 possible_output=[edge.condition for edge in conditional_edges],
             )
@@ -81,14 +110,17 @@ def get_path(conditional_edges: list[Edge], end_node_id: str) -> callable:
                 master_agent_id=master_agent_id,
                 forge_cycle_id=forge_cycle_id,
             )
-            condition = routing_final_state.output_condition
+            condition = getattr(routing_final_state, "output_condition", None)
 
         for edge in conditional_edges:
             if edge.condition == condition:
                 return edge.end_node_id if edge.end_node_id != end_node_id else END
 
-        message = f"No condition found in the last {start_node_id} response." \
-            if condition is None else f"No edge found with the condition {condition}."
+        message = (
+            f"No condition found in the last {start_node_id} response."
+            if condition is None
+            else f"No edge found with the condition {condition}."
+        )
         raise ValueError(message)
 
     # Unlike LangGraph's documentation indicates, the path_map is required

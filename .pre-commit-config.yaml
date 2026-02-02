@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/facebook/pyrefly-pre-commit
+    rev: 0.50.1
+    hooks:
+      - id: pyrefly-check
+        name: Pyrefly (type checking)
+        pass_filenames: false
+        additional_dependencies:
+          - asyncio>=3.4.3
+          - elasticsearch>=9.0.2
+          - ipykernel>=6.29.5
+          - langchain>=0.3.27
+          - langchain-community>=0.3.27
+          - langchain-core>=0.3.74
+          - langchain-openai>=0.3.30
+          - langfuse>=3.2.4
+          - langgraph>=0.6.4
+          - litellm>=1.60.0
+          - loguru>=0.7.3
+          - nest-asyncio>=1.6.0
+          - openai<1.100
+          - openapi-client
+          - pydantic>=2.10.6
+          - python-dotenv>=1.0.1
+          - seaborn>=0.13.2
+          - sortedcontainers>=2.4.0
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
