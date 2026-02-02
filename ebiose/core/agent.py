@@ -27,6 +27,11 @@ _observe_typed = cast("_ObserveDecorator", observe)
 
 
 class Agent(BaseModel):
+    """Agent instance representing an executable AI workflow.
+
+    Stores identity, configuration, and the execution engine used to run tasks.
+    """
+
     id: str = Field(default_factory=lambda: "agent-" + str(uuid.uuid4()))
     name: str | None = None
     agent_type: Literal["architect", "genetic_operator"] | None = None
@@ -43,7 +48,7 @@ class Agent(BaseModel):
 
     @model_validator(mode="after")
     def validate_agent_type_consistency(self) -> Self:
-        """Validate that agent type fields are consistent."""
+        """Validate that agent type fields are consistent with agent configuration."""
         if self.agent_type == "architect" and not self.architect_agent_id:
             # For architects, we might not have an architect_agent_id
             pass
@@ -61,6 +66,15 @@ class Agent(BaseModel):
 
     @field_serializer("agent_engine")
     def serialize_agent_engine(self, agent_engine: AgentEngine | None) -> dict:
+        """Serialize agent engine to dictionary format.
+
+        Args:
+            agent_engine: The agent engine to serialize.
+
+        Returns:
+            Dictionary representation of the agent engine.
+
+        """
         if agent_engine is not None:
             return agent_engine.model_dump(
                 by_alias=True,
@@ -70,12 +84,36 @@ class Agent(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def validate_agent(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Validate and process agent data before model initialization.
+
+        Args:
+            data: Raw agent data to validate.
+
+        Returns:
+            Processed agent data with validated agent engine.
+
+        """
         if "agent_engine" in data and data["agent_engine"] is not None:
             data["agent_engine"] = cls.validate_agent_engine(data["agent_engine"])
         return data
 
     @classmethod
-    def validate_agent_engine(cls, agent_engine: dict[str, Any] | AgentEngine) -> AgentEngine:
+    def validate_agent_engine(
+        cls,
+        agent_engine: dict[str, Any] | AgentEngine | object,
+    ) -> AgentEngine:
+        """Validate and create an agent engine from various input formats.
+
+        Args:
+            agent_engine: Engine as dict, AgentEngine instance, or other object.
+
+        Returns:
+            Validated AgentEngine instance.
+
+        Raises:
+            TypeError: If engine format is not recognized.
+
+        """
         if isinstance(agent_engine, dict):
             return AgentEngineFactory.create_engine(
                 engine_type=cast("str", agent_engine["engine_type"]),
@@ -90,6 +128,12 @@ class Agent(BaseModel):
 
     @model_validator(mode="after")
     def generate_embeddings(self) -> Self:
+        """Generate semantic embeddings for the agent description.
+
+        Returns:
+            The agent instance with generated embeddings if description is provided.
+
+        """
         if self.description_embedding is None and self.description is not None:
             embedding = generate_embeddings(self.description)
             self.description_embedding = cast(
@@ -106,6 +150,21 @@ class Agent(BaseModel):
         forge_cycle_id: str | None = None,
         **kwargs: dict[str, Any],
     ) -> BaseModel:
+        """Execute the agent engine with the given input.
+
+        Args:
+            input_data: Input data for the agent run.
+            master_agent_id: ID of the master agent coordinating execution.
+            forge_cycle_id: Optional forge cycle identifier.
+            **kwargs: Additional engine-specific options.
+
+        Returns:
+            Output produced by the agent engine.
+
+        Raises:
+            RuntimeError: If the agent engine is not configured.
+
+        """
         if self.agent_engine is None:
             msg = "Agent engine is not configured"
             raise RuntimeError(msg)
@@ -121,6 +180,13 @@ class Agent(BaseModel):
         agent_input_model: type[BaseModel] | None = None,
         agent_output_model: type[BaseModel] | None = None,
     ) -> None:
+        """Update the input and output models for the agent engine.
+
+        Args:
+            agent_input_model: New input model for the agent engine.
+            agent_output_model: New output model for the agent engine.
+
+        """
         if self.agent_engine is None:
             msg = "Agent engine is not configured"
             raise RuntimeError(msg)

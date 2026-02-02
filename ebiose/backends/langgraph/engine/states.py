@@ -18,26 +18,33 @@ if TYPE_CHECKING:
 
 
 class LangGraphEngineInputState(BaseModel):
+    """Base input state for LangGraph engine execution."""
+
     messages: Annotated[Sequence[AnyMessage], add_messages] = []
     input: BaseModel
     error_message: str = ""
 
 
 class LangGraphEngineOutputState(BaseModel):
+    """Base output state for LangGraph engine execution."""
+
     messages: Annotated[Sequence[AnyMessage], add_messages] = []
     error_message: str = ""
     output: BaseModel | None = Field(default=None)
 
     @computed_field
     def n_messages(self) -> int:
+        """Return the number of messages in the state."""
         return len(self.messages)
 
 
 class LangGraphEngineState(LangGraphEngineInputState, LangGraphEngineOutputState):
-    pass
+    """Combined input/output state for LangGraph engine execution."""
 
 
 class LangGraphEngineContext(BaseModel):
+    """Execution context for LangGraph engine runs."""
+
     model_endpoint_id: str = Field(
         ...,
         description="The id of the model endpoint to use",

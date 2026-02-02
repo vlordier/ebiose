@@ -12,14 +12,20 @@ from ebiose.core.engines.graph_engine.nodes.agent_node import AgentNode
 
 
 class InputState(BaseModel):
-    pass
+    """Input state model for LangGraph agent nodes."""
 
 
 class OutputState(BaseModel):
-    pass
+    """Output state model for LangGraph agent nodes."""
 
 
 class LangGraphAgentNode(AgentNode):
+    """LangGraph implementation of agent nodes.
+
+    Executes agents using the LangGraph backend, handling state transformation
+    and response processing.
+    """
+
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
@@ -28,6 +34,19 @@ class LangGraphAgentNode(AgentNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Execute the agent with the given state.
+
+        Args:
+            state: Input state for the agent.
+            config: Optional configuration override.
+
+        Returns:
+            Dictionary containing the agent response.
+
+        Raises:
+            RuntimeError: If agent engine is not configured.
+
+        """
         _ = config  # Unused parameter
         agent_engine = self.agent.agent_engine
         if agent_engine is None or agent_engine.input_model is None:

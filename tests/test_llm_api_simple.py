@@ -3,11 +3,10 @@
 the full modules (to avoid dependency issues).
 """
 
-import sys
 from pathlib import Path
 
 
-def test_initialization_logic():
+def test_initialization_logic() -> None:
     """Test the initialization logic by examining the source code."""
     # Read the LLMApi source
     llm_api_path = Path(__file__).parent.parent / "ebiose" / "core" / "llm_api.py"
@@ -30,14 +29,12 @@ def test_initialization_logic():
 
     print("Checking for hardcoded URLs...")
 
-    if old_hardcoded_url in llm_api_content:
-        print("❌ Found hardcoded URL in llm_api.py")
-        return False
+    assert old_hardcoded_url not in llm_api_content, "Found hardcoded URL in llm_api.py"
     print("✓ No hardcoded URL in llm_api.py")
 
-    if old_hardcoded_url in langgraph_api_content:
-        print("❌ Found hardcoded URL in langgraph/llm_api.py")
-        return False
+    assert old_hardcoded_url not in langgraph_api_content, (
+        "Found hardcoded URL in langgraph/llm_api.py"
+    )
     print("✓ No hardcoded URL in langgraph/llm_api.py")
 
     # Check that the proper logic is in place
@@ -53,46 +50,39 @@ def test_initialization_logic():
     ]
 
     for pattern in expected_patterns:
-        if pattern not in llm_api_content:
-            print(f"❌ Missing pattern in llm_api.py: {pattern}")
-            return False
-
-        if pattern not in langgraph_api_content:
-            print(f"❌ Missing pattern in langgraph/llm_api.py: {pattern}")
-            return False
+        assert pattern in llm_api_content, f"Missing pattern in llm_api.py: {pattern}"
+        assert pattern in langgraph_api_content, (
+            f"Missing pattern in langgraph/llm_api.py: {pattern}"
+        )
 
     print("✓ All expected patterns found in both files")
 
     # Check that ModelEndpoints is imported in llm_api.py
-    if "from ebiose.core.model_endpoint import ModelEndpoints" not in llm_api_content:
-        print("❌ ModelEndpoints not imported in llm_api.py")
-        return False
+    assert "from ebiose.core.model_endpoint import ModelEndpoints" in llm_api_content, (
+        "ModelEndpoints not imported in llm_api.py"
+    )
     print("✓ ModelEndpoints properly imported in llm_api.py")
 
-    return True
 
-
-def main():
+def main() -> None:
     """Run the test."""
     print("Testing LLMApi initialization fixes...")
     print("=" * 50)
 
-    if test_initialization_logic():
-        print("\n" + "=" * 50)
-        print("✅ All tests passed! The hardcoded URL issue has been fixed.")
-        print("\nSummary of changes:")
-        print("- Removed hardcoded lite_llm_api_base URL")
-        print(
-            "- Cloud mode now uses the lite_llm_api_base provided by the Ebiose cloud API",
-        )
-        print(
-            "- Local mode attempts to use configuration from model_endpoints.yml via ModelEndpoints",
-        )
-        print("- Proper fallback behavior when no URL is available")
-        print("- Added proper import for ModelEndpoints in llm_api.py")
-    else:
-        print("\n❌ Some tests failed!")
-        sys.exit(1)
+    test_initialization_logic()
+
+    print("\n" + "=" * 50)
+    print("✅ All tests passed! The hardcoded URL issue has been fixed.")
+    print("\nSummary of changes:")
+    print("- Removed hardcoded lite_llm_api_base URL")
+    print(
+        "- Cloud mode now uses the lite_llm_api_base provided by the Ebiose cloud API",
+    )
+    print(
+        "- Local mode attempts to use configuration from model_endpoints.yml via ModelEndpoints",
+    )
+    print("- Proper fallback behavior when no URL is available")
+    print("- Added proper import for ModelEndpoints in llm_api.py")
 
 
 if __name__ == "__main__":

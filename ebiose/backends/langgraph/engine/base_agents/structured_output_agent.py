@@ -16,6 +16,7 @@ from ebiose.backends.langgraph.engine.pydantic_validator_node import (
     LangGraphPydanticValidatorNode,
 )
 from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
@@ -34,10 +35,19 @@ def init_structured_output_agent(
     output_model: type[BaseModel],
     model_endpoint_id: str,
 ) -> Agent:
-    # Type checking: ensure output_model is actually a class
-    if not isinstance(output_model, type):
-        msg = "output_model must be a class"
-        raise TypeError(msg)
+    """Initialize an agent that formats outputs to a specific Pydantic model.
+
+    This agent uses an LLM to transform and format input data into a
+    structured output matching the provided Pydantic model.
+
+    Args:
+        output_model: The Pydantic model to format outputs to.
+        model_endpoint_id: The LLM model endpoint ID to use.
+
+    Returns:
+        An Agent instance configured for structured output generation.
+
+    """
 
     class AgentInput(BaseModel):
         last_message: AnyMessage | None = None
@@ -95,7 +105,7 @@ def init_structured_output_agent(
         ),
     )
 
-    agent_id = "agent-20419b21-ba04-4673-b72f-c798dba9e313"
+    agent_id = SystemAgentId.STRUCTURED_OUTPUT
 
     agent_engine = LangGraphEngine(
         agent_id=agent_id,

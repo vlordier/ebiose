@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 
 
 class GraphUtils:
+    """Factory and cache utilities for graph-related agents."""
+
     _architect_agent: Agent | None = None
     _crossover_agent: Agent | None = None
     _mutation_agent: Agent | None = None
@@ -44,6 +46,12 @@ class GraphUtils:
 
     @classmethod
     def get_routing_agent(cls) -> Agent:
+        """Return a cached routing agent instance.
+
+        Returns:
+            Routing agent.
+
+        """
         model_endpoint_id = ModelEndpoints.get_default_utility_agent_endpoint_id()
         if cls._routing_agent is None:
             cls._routing_agent = init_routing_agent(model_endpoint_id)
@@ -63,6 +71,15 @@ class GraphUtils:
         cls,
         output_model: type[BaseModel],
     ) -> Agent:
+        """Return a cached structured-output agent for a given output model.
+
+        Args:
+            output_model: Pydantic model for structured outputs.
+
+        Returns:
+            Structured output agent.
+
+        """
         # TODO(xabier): find a way to handle multiple structured output agents
         model_endpoint_id = ModelEndpoints.get_default_utility_agent_endpoint_id()
         model_hash = cls._get_model_hash(output_model)
@@ -77,18 +94,45 @@ class GraphUtils:
 
     @classmethod
     def get_architect_agent(cls, model_endpoint_id: str | None = None) -> Agent:
+        """Return a cached architect agent instance.
+
+        Args:
+            model_endpoint_id: Optional model endpoint override.
+
+        Returns:
+            Architect agent.
+
+        """
         if cls._architect_agent is None:
             cls._architect_agent = init_architect_agent(model_endpoint_id)
         return cls._architect_agent
 
     @classmethod
     def get_crossover_agent(cls, model_endpoint_id: str | None = None) -> Agent:
+        """Return a cached crossover agent instance.
+
+        Args:
+            model_endpoint_id: Optional model endpoint override.
+
+        Returns:
+            Crossover agent.
+
+        """
         if cls._crossover_agent is None:
             cls._crossover_agent = init_crossover_agent(model_endpoint_id)
         return cls._crossover_agent
 
     @classmethod
     def get_mutation_agent(cls, model_endpoint_id: str | None = None) -> Agent:
+        """Return a cached mutation agent instance.
+
+        Args:
+            model_endpoint_id: Optional model endpoint override.
+
+        Returns:
+            Mutation agent.
+
+        """
         if cls._mutation_agent is None:
             cls._mutation_agent = init_mutation_agent(model_endpoint_id)
         return cls._mutation_agent

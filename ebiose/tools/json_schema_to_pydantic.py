@@ -1,3 +1,5 @@
+"""Utilities for building Pydantic models from JSON Schema."""
+
 import logging  # Use logging for warnings/errors
 from contextlib import suppress
 from typing import Any, ForwardRef, Optional, Union, cast
@@ -35,9 +37,8 @@ def _as_schema_dict(schema: object) -> JsonSchema | None:
 def _is_optional_type(field_type: object) -> bool:
     if field_type is type(None):
         return True
-    return (
-        getattr(field_type, "__origin__", None) is Union
-        and type(None) in getattr(field_type, "__args__", ())
+    return getattr(field_type, "__origin__", None) is Union and type(None) in getattr(
+        field_type, "__args__", ()
     )
 
 
@@ -77,6 +78,7 @@ def _build_field_definition(
         field_definition = default_value
 
     return field_type, field_definition
+
 
 # --- Caching (Module Level for a Single Run) ---
 # These caches store models created during a single call to the main function.
@@ -351,8 +353,7 @@ def _create_model_recursive(
 
     # Create the Pydantic V2 model using create_model
     field_definitions: dict[str, tuple[object, object]] = {
-        key: (value[0], value[1])
-        for key, value in fields.items()
+        key: (value[0], value[1]) for key, value in fields.items()
     }
     try:
         created_model: ModelType = create_model(
@@ -362,7 +363,9 @@ def _create_model_recursive(
         )
     except Exception as e:
         LOGGER.exception(
-            "Pydantic create_model failed for '%s' with fields %s.", model_name, fields,
+            "Pydantic create_model failed for '%s' with fields %s.",
+            model_name,
+            fields,
         )
         # Fallback or re-raise depending on desired robustness
         msg = f"Failed to create Pydantic model '{model_name}'"
@@ -432,6 +435,7 @@ def _process_definitions(schema: JsonSchema) -> None:
                     str(def_name),
                 )
 
+
 def create_pydantic_model_from_schema(
     schema: object,
     model_name: str | None = None,
@@ -468,7 +472,9 @@ def create_pydantic_model_from_schema(
     schema_dict = cast("JsonSchema", schema)
 
     # Determine the name for the top-level model
-    top_level_model_name = model_name or cast("str", schema_dict.get("title", "DynamicModel"))
+    top_level_model_name = model_name or cast(
+        "str", schema_dict.get("title", "DynamicModel")
+    )
 
     # --- Step 1: Pre-process definitions ($defs) ---
     _process_definitions(schema_dict)
@@ -506,7 +512,8 @@ def create_pydantic_model_from_schema(
         if callable(model_rebuild):
             model_rebuild(force=True)
             LOGGER.info(
-                "Final rebuild completed for top-level model '%s'.", final_model.__name__,
+                "Final rebuild completed for top-level model '%s'.",
+                final_model.__name__,
             )
     except (ValueError, TypeError, AttributeError) as e:
         LOGGER.warning(
@@ -526,7 +533,6 @@ def create_pydantic_model_from_schema(
 # ==============================================================================
 if __name__ == "__main__":
     import json  # Keep json import local to the example if only used here
-    import logging  # Ensure logging is configured if not already global
     import sys
     from pathlib import Path
 
@@ -545,11 +551,15 @@ if __name__ == "__main__":
 
     # --- Define original Pydantic models ---
     class Address(BaseModel):
+        """Example address model used for schema reconstruction."""
+
         street_address: str
         city: str
         zip_code: str | None = None
 
     class Person(BaseModel):
+        """Example person model used for schema reconstruction."""
+
         name: str
         age: int
         is_student: bool = False
@@ -569,7 +579,8 @@ if __name__ == "__main__":
     try:
         ReconstructedPerson = create_pydantic_model_from_schema(person_schema)
         LOGGER.info(
-            "Successfully reconstructed model: %s", ReconstructedPerson.__name__,
+            "Successfully reconstructed model: %s",
+            ReconstructedPerson.__name__,
         )
 
         # --- Inspect the reconstructed model ---
@@ -582,7 +593,8 @@ if __name__ == "__main__":
             # Use get_default() for potentially computed defaults, otherwise .default
             default_val = field_info.get_default(call_default_factory=False)
             LOGGER.info(
-                "      Default:    %r", default_val,
+                "      Default:    %r",
+                default_val,
             )  # Use !r via %r for representation
 
         # --- Test instantiation ---
@@ -636,11 +648,15 @@ if __name__ == "__main__":
     # Use STRING HINTS ('Employee', 'Department') for smoother schema generation
 
     class Department(BaseModel):
+        """Example department model with circular references."""
+
         name: str
         manager: Optional["Employee"] = None  # Use string hint
         staff: list["Employee"] = []  # Use string hint
 
     class Employee(BaseModel):
+        """Example employee model with circular references."""
+
         name: str
         department: "Department"  # Use string hint
 
@@ -666,7 +682,8 @@ if __name__ == "__main__":
             model_name="ReconstructedDept",
         )
         LOGGER.info(
-            "Successfully reconstructed model: %s", ReconstructedDept.__name__,
+            "Successfully reconstructed model: %s",
+            ReconstructedDept.__name__,
         )
 
         # --- Inspect the circularly referenced model fields ---
@@ -679,9 +696,7 @@ if __name__ == "__main__":
         )
 
         manager_field = ReconstructedDept.model_fields.get("manager")
-        manager_type = (
-            manager_field.annotation if manager_field else "Not Found"
-        )
+        manager_type = manager_field.annotation if manager_field else "Not Found"
         LOGGER.info("Manager type annotation: %s", manager_type)
 
         staff_field = ReconstructedDept.model_fields.get("staff")
@@ -694,7 +709,8 @@ if __name__ == "__main__":
         )  # Name from schema $defs
 
         if isinstance(reconstructed_employee_type, type) and issubclass(
-            reconstructed_employee_type, BaseModel,
+            reconstructed_employee_type,
+            BaseModel,
         ):
             LOGGER.info(
                 "\n--- Reconstructed Employee (from Cache: %s) Fields ---",
@@ -733,6 +749,7 @@ if __name__ == "__main__":
     # Get schema (e.g., from Department) - This should now work
     try:
         from ebiose.core.engines.graph_engine.graph import Graph
+
         with suppress(pydantic.PydanticUserError):
             Graph.model_rebuild()
 
@@ -750,7 +767,8 @@ if __name__ == "__main__":
             model_name="ReconstructedGraph",
         )
         LOGGER.info(
-            "Successfully reconstructed model: %s", ReconstructedGraph.__name__,
+            "Successfully reconstructed model: %s",
+            ReconstructedGraph.__name__,
         )
 
         # --- Inspect the circularly referenced model fields ---
@@ -761,5 +779,6 @@ if __name__ == "__main__":
     except ImportError as e:
         LOGGER.info("Skipping Ebiose Graph test due to environment/path issues: %s", e)
     except (RuntimeError, ValueError, RecursionError, pydantic.PydanticUserError) as e:
-        LOGGER.info("Skipping Ebiose Graph test due to Pydantic error in source model: %s", e)
-
+        LOGGER.info(
+            "Skipping Ebiose Graph test due to Pydantic error in source model: %s", e
+        )

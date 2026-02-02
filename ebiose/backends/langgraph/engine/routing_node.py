@@ -7,7 +7,7 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolCall, ToolMessage
 
@@ -26,16 +26,22 @@ if TYPE_CHECKING:
 
 
 class InputState(LangGraphEngineInputState):
+    """Input state for LangGraph routing nodes."""
+
     last_message: AnyMessage
     possible_output: Sequence[str]
 
 
 class OutputState(LangGraphEngineOutputState):
+    """Output state for LangGraph routing nodes."""
+
     output_condition: str | None = None
     condition: Literal["found", "not_found"] | None = None
 
 
 class LangGraphRoutingNode(RoutingNode):
+    """LangGraph routing node that selects a path based on message content."""
+
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
@@ -44,6 +50,16 @@ class LangGraphRoutingNode(RoutingNode):
         condition: str,
         error_message: str | None = None,
     ) -> list[AnyMessage]:
+        """Create routing tool messages based on selection outcome.
+
+        Args:
+            condition: Routing condition ("found" or error state).
+            error_message: Optional error context when routing fails.
+
+        Returns:
+            A list of LangChain messages describing routing outcome.
+
+        """
         tool_call_id = f"call_{self.id}_{uuid.uuid4()}"[40]
         tool_call = ToolCall(
             name=self.name,
@@ -82,6 +98,16 @@ class LangGraphRoutingNode(RoutingNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Route execution based on the last message content.
+
+        Args:
+            state: Input state containing messages and possible outputs.
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Output payload with selected routing condition and messages.
+
+        """
         _ = config  # Unused parameter
         # Handle union type: state can be InputState or dict
         if isinstance(state, dict):
@@ -140,29 +166,23 @@ class LangGraphRoutingNode(RoutingNode):
                 output_condition = condition
 
         if count == 1:
-            return cast(
-                "dict[str, Any]",
-                self.output_state_model(
-                    messages=self.get_messages(condition="found")
-                    if hasattr(self, "output_state_model")
-                    else [],
-                    condition="found",
-                    output_condition=output_condition,
-                ),
-            )
+            return self.output_state_model(
+                messages=self.get_messages(condition="found")
+                if hasattr(self, "output_state_model")
+                else [],
+                condition="found",
+                output_condition=output_condition,
+            ).model_dump()
         error_message = (
             "The message does not contain any of the possible conditions."
             if count == 0
             else "The message contains more than one of the possible conditions."
         )
-        return cast(
-            "dict[str, Any]",
-            self.output_state_model(
-                messages=self.get_messages("error", error_message)
-                if hasattr(self, "output_state_model")
-                else [],
-                error_message=error_message,
-                condition="not_found",
-                output_condition=output_condition,
-            ),
-        )
+        return self.output_state_model(
+            messages=self.get_messages("error", error_message)
+            if hasattr(self, "output_state_model")
+            else [],
+            error_message=error_message,
+            condition="not_found",
+            output_condition=output_condition,
+        ).model_dump()

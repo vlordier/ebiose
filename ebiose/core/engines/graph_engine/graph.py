@@ -135,12 +135,10 @@ class Graph(BaseModel):
 
     @field_validator("nodes", mode="before")
     @classmethod
-    def validate_nodes(cls, nodes: list[dict[str, Any]] | list[BaseNode]) -> list[BaseNode]:
+    def validate_nodes(
+        cls, nodes: list[dict[str, Any]] | list[BaseNode]
+    ) -> list[BaseNode]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
-        if not isinstance(nodes, list):
-            msg = "Field 'nodes' should be a list"
-            raise TypeError(msg)
-
         if len(nodes) == 0:
             msg = "Field 'nodes' cannot be empty."
             raise ValueError(msg)
@@ -158,10 +156,6 @@ class Graph(BaseModel):
     @classmethod
     def validate_edges(cls, edges: list[dict[str, Any]] | list[Edge]) -> list[Edge]:
         """Validate the nodes in the graph and generate explicit errors for retries."""
-        if not isinstance(edges, list):
-            msg = "Field 'edges' should be a list"
-            raise TypeError(msg)
-
         if len(edges) == 0:
             msg = "Field 'edges' cannot be empty."
             raise ValueError(msg)

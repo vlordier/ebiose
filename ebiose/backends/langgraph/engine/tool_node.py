@@ -24,14 +24,16 @@ if TYPE_CHECKING:
 
 
 class InputState(LangGraphEngineInputState):
-    pass
+    """Input state for tool execution nodes."""
 
 
 class OutputState(LangGraphEngineOutputState):
-    pass
+    """Output state for tool execution nodes."""
 
 
 class LangGraphToolNode(BaseNode):
+    """LangGraph node that invokes tools from tool-call messages."""
+
     tools: list = Field(default_factory=list)
     type: Literal["LLMNode"] = "LLMNode"
     purpose: str = Field(..., description="An explanation of what the node is used for")
@@ -52,6 +54,19 @@ class LangGraphToolNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Execute tools from the last message and return tool responses.
+
+        Args:
+            state: Input state containing messages with tool calls.
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            A dictionary with tool response messages.
+
+        Raises:
+            ValueError: If execution fails unexpectedly.
+
+        """
         _ = config  # Unused parameter
         try:
             outputs: list[ToolMessage] = []
@@ -84,7 +99,14 @@ class LangGraphToolNode(BaseNode):
                                     tool_call_id=tool_call.get("id", ""),
                                 ),
                             )
-                    except (ValueError, TypeError, RuntimeError, KeyError, AttributeError, ImportError) as e:
+                    except (
+                        ValueError,
+                        TypeError,
+                        RuntimeError,
+                        KeyError,
+                        AttributeError,
+                        ImportError,
+                    ) as e:
                         logger.warning(
                             f"Failed to invoke tool {tool_call.get('name', 'unknown')}: {e}",
                         )

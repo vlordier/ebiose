@@ -31,6 +31,29 @@ if TYPE_CHECKING:
 
 
 class AgentForge(BaseModel):
+    """Base class for creating and evolving agents through evolutionary algorithms.
+
+    AgentForge manages the creation, evaluation, and evolution of agents within
+    an ecosystem. It defines the input/output models for agents and orchestrates
+    the evolutionary cycle.
+
+    Attributes:
+        id: Unique identifier for the forge.
+        name: Human-readable name of the forge.
+        description: Description of what this forge creates.
+        agent_input_model: Pydantic model defining agent inputs.
+        agent_output_model: Pydantic model defining agent outputs.
+        default_model_endpoint_id: Default LLM endpoint for agent creation.
+        default_generated_agent_engine_type: Engine type for generated agents.
+
+    Example:
+        >>> class MyForge(AgentForge):
+        ...     async def generate_agent(self) -> Agent:
+        ...         # Custom agent generation logic
+        ...         pass
+
+    """
+
     id: str = Field(default_factory=lambda: f"forge-{uuid4()!s}")
     name: str
     description: str
@@ -43,6 +66,12 @@ class AgentForge(BaseModel):
 
     @property
     def description_embedding(self) -> list[float]:
+        """Return or compute the forge description embedding.
+
+        Returns:
+            Cached embedding vector for the forge description.
+
+        """
         if self._description_embedding is None:
             embedding = generate_embeddings(self.description)
             self._description_embedding = cast(
@@ -54,6 +83,15 @@ class AgentForge(BaseModel):
     @field_validator("default_model_endpoint_id", mode="after")
     @classmethod
     def validate_default_model_endpoint_id(cls, value: str | None) -> str:
+        """Resolve the default model endpoint ID when not provided.
+
+        Args:
+            value: Provided model endpoint ID or None.
+
+        Returns:
+            A model endpoint ID to use for this forge.
+
+        """
         if value is None:
             return ModelEndpoints.get_default_model_endpoint_id()
         return value
@@ -64,13 +102,33 @@ class AgentForge(BaseModel):
         agent: Agent,
         **kwargs: str | float | bool | BaseModel,
     ) -> tuple[str, float]:
-        pass
+        """Compute fitness for a given agent.
+
+        Args:
+            agent: The agent to evaluate.
+            **kwargs: Additional evaluation parameters.
+
+        Returns:
+            Tuple of (agent_id, fitness_score).
+
+        """
+        raise NotImplementedError
 
     async def run_new_cycle(
         self,
         config: ForgeCycleConfig,
         ecosystem: Ecosystem | None = None,
     ) -> tuple[dict[str, Agent], dict[str, float]]:
+        """Run a new forge cycle using this forge.
+
+        Args:
+            config: Forge cycle configuration.
+            ecosystem: Optional ecosystem to source agents from.
+
+        Returns:
+            Tuple of (agents dict, fitness dict).
+
+        """
         cycle = ForgeCycle(forge=self, config=config)
 
         return await cycle.execute_a_cycle(ecosystem)
@@ -80,6 +138,13 @@ class AgentForge(BaseModel):
         agents: dict[str, Agent],
         agents_fitness: dict[str, float],
     ) -> None:
+        """Display the best agents and their fitness results.
+
+        Args:
+            agents: Mapping of agent IDs to Agent instances.
+            agents_fitness: Mapping of agent IDs to fitness values.
+
+        """
         sorted_fitness = dict(
             sorted(agents_fitness.items(), key=lambda item: item[1], reverse=True),
         )
@@ -110,14 +175,10 @@ class AgentForge(BaseModel):
                 markdown_str += f"# Agent ID: {agent_id}\n"
                 markdown_str += f"## Fitness: {fitness_value}\n"
                 markdown_str += "```mermaid \n"
-                markdown_str += (
-                    f"{agent_graph.to_mermaid_str(orientation='LR')} \n"
-                )
+                markdown_str += f"{agent_graph.to_mermaid_str(orientation='LR')} \n"
                 markdown_str += "``` \n"
                 markdown_str += "## Prompts:\n"
-                markdown_str += (
-                    f"##### Shared context prompt\n{agent_graph.shared_context_prompt}\n"
-                )
+                markdown_str += f"##### Shared context prompt\n{agent_graph.shared_context_prompt}\n"
                 for node in agent_graph.nodes:
                     if node.type == "LLMNode":
                         markdown_str += f"##### {node.name}\n{node.prompt}\n"

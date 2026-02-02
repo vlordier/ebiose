@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 
 class Ecosystem(BaseModel):
+    """Collection of agents evolving together in a shared ecosystem."""
+
     id: str = Field(default_factory=lambda: f"forge-cycle-{uuid4()!s}")
     initial_architect_agents: list[Agent] | None = None
     initial_genetic_operator_agents: list[Agent] | None = None
@@ -32,6 +34,15 @@ class Ecosystem(BaseModel):
 
     @classmethod
     def new(cls, initial_agents: list[Agent] | None = None) -> Ecosystem:
+        """Create a new ecosystem with initial architect and genetic operator agents.
+
+        Args:
+            initial_agents: Optional list of initial agents to add to the ecosystem.
+
+        Returns:
+            A new Ecosystem instance.
+
+        """
         initial_architect_agents = [
             GraphUtils.get_architect_agent(
                 ModelEndpoints.get_default_meta_agent_endpoint_id(),
@@ -48,9 +59,7 @@ class Ecosystem(BaseModel):
         # TODO(xabier): fix this import to avoid circular dependency
 
         cls.model_rebuild()
-        agents_dict = {
-            agent.id: agent for agent in (initial_agents or [])
-        }
+        agents_dict = {agent.id: agent for agent in (initial_agents or [])}
         return cls(
             initial_architect_agents=initial_architect_agents,
             initial_genetic_operator_agents=initial_genetic_operator_agents,
@@ -58,6 +67,15 @@ class Ecosystem(BaseModel):
         )
 
     def get_agent(self, agent_id: str) -> Agent | None:
+        """Get an agent from the ecosystem by ID.
+
+        Args:
+            agent_id: The ID of the agent to retrieve.
+
+        Returns:
+            The Agent if found, None otherwise.
+
+        """
         for agent in self.agents.values():
             if agent.id == agent_id:
                 return agent
@@ -68,6 +86,16 @@ class Ecosystem(BaseModel):
         forge: AgentForge,
         n_agents: int,
     ) -> list[Agent]:
+        """Select agents from the ecosystem for a given forge.
+
+        Args:
+            forge: Target forge selecting agents.
+            n_agents: Number of agents to select.
+
+        Returns:
+            List of selected agents.
+
+        """
         self.add_forge(forge)
         if n_agents <= 0:
             return []
@@ -81,6 +109,12 @@ class Ecosystem(BaseModel):
         return selected_agents
 
     def add_forge(self, forge: AgentForge) -> None:
+        """Add a forge to the ecosystem and compute agent-forge distances.
+
+        Args:
+            forge: The AgentForge to add to the ecosystem.
+
+        """
         self.forge_list.append(forge)
         # Initialize SortedList with existing agents and their distances
         self.agent_forge_distances[forge.id] = SortedList(
@@ -98,6 +132,12 @@ class Ecosystem(BaseModel):
         )
 
     def _add_new_born_agent(self, new_agent: Agent) -> None:
+        """Add a newly created agent to the ecosystem and update distances.
+
+        Args:
+            new_agent: The new agent to add to the ecosystem.
+
+        """
         for forge in self.forge_list:
             distance = embedding_distance(
                 new_agent.description_embedding or [],

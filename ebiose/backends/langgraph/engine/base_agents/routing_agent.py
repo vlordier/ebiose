@@ -15,6 +15,7 @@ from ebiose.backends.langgraph.engine.routing_node import (
     LangGraphRoutingNode,
 )
 from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
@@ -31,15 +32,42 @@ The message is:
 
 
 class AgentInput(BaseModel):
+    """Input model for the routing agent.
+
+    Attributes:
+        last_message: The last message in the conversation.
+        possible_output: List of possible output conditions to route to.
+
+    """
+
     last_message: AnyMessage
     possible_output: list[str]
 
 
 class AgentOutput(BaseModel):
+    """Output model for the routing agent.
+
+    Attributes:
+        output_condition: The selected condition for routing.
+
+    """
+
     output_condition: str | None = None
 
 
 def init_routing_agent(model_endpoint_id: str) -> Agent:
+    """Initialize a routing agent for conditional graph execution.
+
+    The routing agent selects which output edge to take based on the current state,
+    enabling conditional branching in the computational graph.
+
+    Args:
+        model_endpoint_id: The LLM model endpoint ID to use for the routing agent.
+
+    Returns:
+        An Agent instance configured as a routing agent.
+
+    """
     shared_context_prompt = SHARED_CONTEXT_PROMPT
 
     llm_router_node = LLMNode(
@@ -82,7 +110,7 @@ def init_routing_agent(model_endpoint_id: str) -> Agent:
         Edge(start_node_id=llm_router_node.id, end_node_id=routing_node.id),
     )
 
-    agent_id = "agent-cb88834e-cb03-4cf9-b983-2b18fdbbcdc9"
+    agent_id = SystemAgentId.ROUTING
 
     agent_engine = LangGraphEngine(
         agent_id=agent_id,

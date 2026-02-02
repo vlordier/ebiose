@@ -23,14 +23,20 @@ from ebiose.core.engines.graph_engine.nodes.pydantic_validator_node import (
 
 
 class InputState(LangGraphEngineInputState):
+    """Input state for Pydantic validation nodes."""
+
     output_model: type[BaseModel] | None = Field(None, exclude=True)
 
 
 class OutputState(LangGraphEngineOutputState):
+    """Output state for Pydantic validation nodes."""
+
     condition: Literal["success", "failure"] | None = None
 
 
 class LangGraphPydanticValidatorNode(PydanticValidatorNode):
+    """LangGraph node that validates tool outputs against Pydantic models."""
+
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
@@ -39,6 +45,16 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
         condition: str,
         error: Exception | None = None,
     ) -> list[AnyMessage]:
+        """Create tool messages based on validation outcome.
+
+        Args:
+            condition: Validation condition ("success" or "failure").
+            error: Optional exception describing the validation failure.
+
+        Returns:
+            A list of LangChain messages describing the validation result.
+
+        """
         tool_call_id = f"call_{self.id}_{uuid.uuid4()}"[40]
         tool_call = ToolCall(
             name=self.name,
@@ -77,6 +93,16 @@ class LangGraphPydanticValidatorNode(PydanticValidatorNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Validate tool output against a Pydantic model and return status.
+
+        Args:
+            state: Input state containing tool messages.
+            config: Runtime configuration providing the output model.
+
+        Returns:
+            Output payload with validation messages and status.
+
+        """
         try:
             # Handle union type: state can be BaseModel or dict
             messages = (

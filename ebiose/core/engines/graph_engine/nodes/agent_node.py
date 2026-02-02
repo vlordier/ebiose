@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 
 class AgentNode(BaseNode, abc.ABC):
+    """Base node that delegates execution to an Agent instance."""
+
     type: Literal["AgentNode"] = "AgentNode"
     name: str = Field(default_factory=lambda: "agent_node")
     # TODO(xabier): agent_id instead of agent, as agent embeds the agent_engine for now
@@ -27,11 +29,13 @@ class AgentNode(BaseNode, abc.ABC):
     agent: Agent = Field(..., description="The agent to be used")
 
     def get_input_model(self) -> builtins.type[BaseModel] | None:
+        """Return the input model from the agent engine, if available."""
         if self.agent.agent_engine is None:
             return None
         return self.agent.agent_engine.input_model
 
     def get_output_model(self) -> builtins.type[BaseModel] | None:
+        """Return the output model from the agent engine, if available."""
         if self.agent.agent_engine is None:
             return None
         return self.agent.agent_engine.output_model

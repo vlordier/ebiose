@@ -43,11 +43,19 @@ class EdgeConditionError(ValueError):
     """Exception raised when the condition is not found in the edge."""
 
     def __init__(self, condition: str) -> None:
+        """Initialize the error for a missing routing condition.
+
+        Args:
+            condition: The condition that could not be matched.
+
+        """
         message = f"No edge found with the condition {condition}."
         super().__init__(message)
 
 
 class RoutingState(Protocol):
+    """Protocol for routing state used in conditional edge selection."""
+
     condition: str | None
     messages: list[Any]
     model_fields: dict[str, Any]

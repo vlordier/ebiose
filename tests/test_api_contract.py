@@ -1,12 +1,12 @@
-"""Test script to verify the refactoring is working correctly."""
+"""Test script to verify the API contract and refactoring status."""
 
 from ebiose.backends.langgraph.llm_api import LangGraphLLMApi
 from ebiose.core.llm_api import LLMApi
 from ebiose.core.llm_api_factory import LLMApiFactory
 
 
-def test_refactoring() -> None:
-    """Test that the refactoring works correctly."""
+def test_llm_api_refactoring() -> None:
+    """Test that the refactoring is working correctly and types are preserved."""
     # Test 1: Factory should use LangGraphLLMApi by default
     api = LLMApiFactory.initialize(mode="local")
     assert api == LangGraphLLMApi, f"Expected LangGraphLLMApi, got {api}"
@@ -31,9 +31,3 @@ def test_refactoring() -> None:
     assert hasattr(LangGraphLLMApi, "process_llm_call"), (
         "LangGraphLLMApi should have process_llm_call method"
     )
-
-    print("All tests passed! Refactoring is working correctly.")
-
-
-if __name__ == "__main__":
-    test_refactoring()

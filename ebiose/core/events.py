@@ -1,3 +1,5 @@
+"""Event models and logging utilities for forge cycle execution."""
+
 from __future__ import annotations
 
 import datetime
@@ -50,6 +52,7 @@ event_logger = _logger
 
 
 def elastic_sink(message: Message) -> None:
+    """Send structured log records to the Ebiose cloud logging endpoint."""
     record = message.record
     record_extra = record.get("extra", {})
     event_payload = (
@@ -108,6 +111,7 @@ class BaseEvent(BaseModel):
 
     @computed_field
     def event_name(self) -> str:
+        """Return the event class name for logging and serialization."""
         return self.__class__.__name__
 
     @computed_field
@@ -136,6 +140,7 @@ class BaseEvent(BaseModel):
         return self.initial_budget - self.remaining_budget
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the event to a JSON-compatible dictionary."""
         return self.model_dump(mode="json")
 
     def log(self, message_override: str | None = None) -> None:

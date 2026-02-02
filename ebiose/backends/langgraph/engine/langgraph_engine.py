@@ -42,6 +42,20 @@ _observe_typed = cast("_ObserveDecorator", observe)
 
 
 class LangGraphEngine(GraphEngine):
+    """LangGraph-based execution engine for computational graphs.
+
+    Implements the GraphEngine interface using LangGraph for state management
+    and graph execution. Supports LLM nodes with tools, conditional routing,
+    and recursive graph execution.
+
+    Attributes:
+        engine_type: Always 'langgraph_engine'.
+        model_endpoint_id: Optional LLM endpoint ID for LLM nodes.
+        recursion_limit: Maximum recursion depth for graph execution.
+        tags: Optional tags for tracking and filtering.
+
+    """
+
     engine_type: str = "langgraph_engine"
     model_endpoint_id: str | None = None
     recursion_limit: int = Field(default=15)
@@ -131,9 +145,9 @@ class LangGraphEngine(GraphEngine):
                 return cast(
                     "BaseModel | dict | None",
                     await structured_output_agent.run(
-                    so_agent_input,
-                    master_agent_id,
-                    forge_cycle_id=forge_cycle_id,
+                        so_agent_input,
+                        master_agent_id,
+                        forge_cycle_id=forge_cycle_id,
                     ),
                 )
             except (ValueError, TypeError, RuntimeError) as e:
@@ -260,9 +274,6 @@ class LangGraphEngine(GraphEngine):
             **node_config,
         )
 
-        if compiled_graph is None:
-            msg = "Failed to compile graph"
-            raise RuntimeError(msg)
         return cast(
             "dict[str, Any]",
             await compiled_graph.ainvoke(

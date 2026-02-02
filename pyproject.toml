@@ -31,7 +31,7 @@ dependencies = [
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-exclude = ["notebooks", "ebiose/generated_cloud_sdk", "ebiose/stubs", "typing_stubs"]
+exclude = ["notebooks", "ebiose/generated_cloud_sdk", "typing_stubs"]
 
 [tool.pyrefly.errors]
 redundant-condition = "error"
@@ -40,21 +40,14 @@ redundant-condition = "error"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-  "D107",    # missing docstring in __init__
+  "COM812",  # Missing trailing comma (conflicts with ruff formatter)
   "D203",    # one blank line before class (conflicts with D211)
-  "E501",    # line too long
-  "FIX002",  # Lines has TODO
-  "PT023",   # messes up pytest.mark.costly
-  "TD003",   # issue link in a TODO comment
-  "D100",    # Missing docstring in public module
-  "D101",    # Missing docstring in public class
-  "D102",    # Missing docstring in public method
-  "D103",    # Missing docstring in public function
-  "D104",    # Missing docstring in public package
-  "D105",    # Missing docstring in magic method
-  "D106",    # Missing docstring in nested public class
+  "E501",    # line too long (handled by formatter)
   "D213",    # multi-line-summary-second-line (conflicts with D212)
-  "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+  "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",  # docstrings (too many to require right now)
+  "S311",    # standard-library-random (random module sufficient for non-crypto use)
+  "FIX002",  # Line contains TODO, consider resolving the issue (handled by development process)
+  "TD003",   # Missing issue link for TODO (handled by development process)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -70,32 +63,40 @@ ignore = [
 "Makefile*" = ["E501", "D100", "D101"]
 # Type stubs - third-party library stubs with intentional Any usage
 "typing_stubs/**/*.pyi" = ["ALL"]
-"ebiose/stubs/**/*.pyi" = ["ALL"]
 # Code sandbox execution - intentionally uses exec() with restricted builtins for safe user code execution
 "ebiose/core/engines/graph_engine/nodes/code_node.py" = ["S102"]
 # Test files - allow assert, print, relaxed typing
-"tests/**/*.py" = ["S101", "T201", "ANN", "D"]
-"test_*.py" = ["S101", "T201", "ANN", "D"]
+"tests/**/*.py" = ["S101", "T201", "ANN", "D", "RET503"]
+"test_*.py" = ["S101", "T201", "ANN", "D", "RET503"]
 
 
 [tool.mypy]
 python_version = "3.12"
 python_executable = "python3.12"
 mypy_path = ["typing_stubs"]
+# Strictest possible settings
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-# Advanced features
-enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+# Type checking enforcement
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+check_untyped_defs = true
+# Advanced features for maximum safety
+enable_error_code = [
+  "ignore-without-code",
+  "redundant-expr",
+  "truthy-bool",
+  "unreachable",
+  "unused-ignore",
+]
 extra_checks = true
 exclude = [
     "notebooks/",
@@ -136,7 +137,6 @@ project-excludes = [
     "**/ebiose/generated_cloud_sdk/",
 ]
 search-path = ["typing_stubs"]
-python-interpreter-path = "/Users/vincent/.pyenv/shims/python3.12"
 python-version = "3.12"
 
 [build-system]
@@ -146,12 +146,16 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=5.0.0",
     "types-aiofiles>=25.1.0.20251011",
     "types-psutil>=7.2.1.20260116",
     "types-pyyaml>=6.0.12.20250915",
     "types-requests>=2.32.4.20260107",
     "types-tqdm>=4.67.0.20250809",
     "types-tzlocal>=5.1.0.1",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.26.0",
 ]
 # extra_search_path = ["typing_stubs"]
 # exclude = [

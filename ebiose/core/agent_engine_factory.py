@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 
 
 class AgentEngineFactory:
+    """Factory for creating agent execution engines.
+
+    Provides methods to instantiate different types of agent engines
+    based on configuration and type specifications.
+    """
+
     @staticmethod
     def create_engine(
         engine_type: str,
@@ -24,6 +30,21 @@ class AgentEngineFactory:
         configuration: dict,
         model_endpoint_id: str | None = None,
     ) -> AgentEngine:
+        """Create an agent engine of the specified type.
+
+        Args:
+            engine_type: Type of engine to create (e.g., 'langgraph_engine').
+            agent_id: ID of the agent using this engine.
+            configuration: Engine configuration dictionary.
+            model_endpoint_id: Optional LLM model endpoint ID.
+
+        Returns:
+            Configured AgentEngine instance.
+
+        Raises:
+            ValueError: If engine_type is not recognized.
+
+        """
         if engine_type == "langgraph_engine":
             if model_endpoint_id is None:
                 model_endpoint_id = ModelEndpoints.get_default_model_endpoint_id()

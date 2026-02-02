@@ -186,6 +186,8 @@ cython_debug/
 data/*
 # Model endpoint YAML
 model_endpoints.yml
+# Generated documentation
+site/
 
 # macOS files
 .DS_Store

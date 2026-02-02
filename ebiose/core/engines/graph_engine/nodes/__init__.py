@@ -1,23 +1,30 @@
+"""Graph node implementations.
+
+Provides different node types for building computational graphs,
+including LLM nodes, code execution nodes, routing nodes, and more.
+"""
+
 import importlib
 import random
 from functools import reduce
+from typing import Any
 
-from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode as LLMNode
-from ebiose.core.engines.graph_engine.nodes.node import (
-    BaseNode,
-)
-from ebiose.core.engines.graph_engine.nodes.node import (
-    EndNode as EndNode,
-)
-from ebiose.core.engines.graph_engine.nodes.node import (
-    StartNode as StartNode,
-)
+from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
+from ebiose.core.engines.graph_engine.nodes.node import BaseNode, EndNode, StartNode
 from ebiose.core.engines.graph_engine.nodes.pydantic_validator_node import (
-    PydanticValidatorNode as PydanticValidatorNode,
+    PydanticValidatorNode,
 )
-from ebiose.core.engines.graph_engine.nodes.routing_node import (
-    RoutingNode as RoutingNode,
-)
+from ebiose.core.engines.graph_engine.nodes.routing_node import RoutingNode
+
+__all__ = [
+    "BaseNode",
+    "EndNode",
+    "LLMNode",
+    "PydanticValidatorNode",
+    "RoutingNode",
+    "StartNode",
+    "get_all_subclasses",
+]
 
 
 def get_all_subclasses(cls: type) -> list[type]:
@@ -50,11 +57,9 @@ if BaseNode in node_types:
 
 
 # Create the NodeTypes union from the node types list
-def _union_types(acc: type[BaseNode], t: type[BaseNode]) -> type[BaseNode]:
-    return acc | t
-
-
-NodeTypes = reduce(_union_types, node_types)
+# This creates a union type dynamically at runtime for all node subclasses
+# The reduce operation creates a union type, which mypy cannot properly type
+NodeTypes: Any = reduce(lambda acc, t: acc | t, node_types)  # type: ignore[arg-type, return-value]
 
 
 def get_node_types_docstrings(node_types_names: list) -> str:

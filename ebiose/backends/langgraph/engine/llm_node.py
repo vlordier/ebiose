@@ -28,15 +28,15 @@ from ebiose.core.engines.graph_engine.utils import get_placeholders
 
 
 class InputState(LangGraphEngineInputState):
-    pass
+    """Input state for LangGraph LLM nodes."""
 
 
 class OutputState(LangGraphEngineOutputState):
-    pass
+    """Output state for LangGraph LLM nodes."""
 
 
 class LangGraphLLMNodeError(Exception):
-    """Custom exception for errors during LLM calls."""
+    """Custom exception for errors during LLM calls in LangGraph nodes."""
 
     def __init__(
         self,
@@ -44,11 +44,25 @@ class LangGraphLLMNodeError(Exception):
         original_exception: Exception | None = None,
         llm_identifier: str | None = None,
     ) -> None:
+        """Initialize the exception.
+
+        Args:
+            message: Error message.
+            original_exception: The underlying exception that caused this error.
+            llm_identifier: Identifier of the LLM that caused the error.
+
+        """
         super().__init__(message)
         self.original_exception = original_exception
         self.llm_identifier = llm_identifier
 
     def __str__(self) -> str:
+        """Return a detailed error message including nested traceback info.
+
+        Returns:
+            A formatted error string containing context and original traceback.
+
+        """
         error_msg = "LangGraphLLMNodeError"
         if self.llm_identifier:
             error_msg += f" (LLM: {self.llm_identifier})"
@@ -64,12 +78,20 @@ class LangGraphLLMNodeError(Exception):
 
 
 class LangGraphLLMNode(LLMNode):
+    """LangGraph implementation of LLM nodes.
+
+    Executes LLM calls using the LangGraph backend with support for tools
+    and temperature settings.
+    """
+
     temperature: float | None = None
     tools: list | None = Field(default_factory=list)
     input_state_model: type[BaseModel] = InputState
     output_state_model: type[BaseModel] = OutputState
 
-    def _validate_and_extract_runtime(self, state: BaseModel | dict, config: BaseModel | None) -> Runtime:
+    def _validate_and_extract_runtime(
+        self, state: BaseModel | dict, config: BaseModel | None
+    ) -> Runtime:
         """Validate state and config, return Runtime."""
         if not isinstance(state, InputState):
             msg = "Invalid state type for LangGraphLLMNode"
@@ -87,7 +109,10 @@ class LangGraphLLMNode(LLMNode):
 
     def _build_system_message(self, runtime: Runtime, input_data: BaseModel) -> str:
         """Build system message with context prompt."""
-        shared_context_prompt = runtime.context.shared_context_prompt
+        shared_context_prompt: str = cast(
+            "str",
+            runtime.context.shared_context_prompt,
+        )
         placeholders = get_placeholders(shared_context_prompt)
 
         # TODO(xabier): this is a temporary solution to generate missing fields for achitect agents
@@ -113,7 +138,13 @@ class LangGraphLLMNode(LLMNode):
 
         return shared_context_prompt + f"\nYour are the {self.name} node."
 
-    def _build_human_message(self, state: InputState, runtime: Runtime, input_data: BaseModel, output_conditions: list[str]) -> str:
+    def _build_human_message(
+        self,
+        state: InputState,
+        runtime: Runtime,
+        input_data: BaseModel,
+        output_conditions: list[str],
+    ) -> str:
         """Build human message with user request."""
         if len(state.error_message) == 0:
             human_prompt = self.prompt.format(
@@ -134,6 +165,19 @@ class LangGraphLLMNode(LLMNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Execute the LLM node using the LangGraph runtime.
+
+        Args:
+            state: Input state for the node.
+            config: Runtime configuration, must be a LangGraph Runtime.
+
+        Returns:
+            A dictionary representing the output state payload.
+
+        Raises:
+            LangGraphLLMNodeError: When the LLM call fails or configuration is invalid.
+
+        """
         runtime = self._validate_and_extract_runtime(state, config)
         state = cast("InputState", state)
 
@@ -149,7 +193,9 @@ class LangGraphLLMNode(LLMNode):
 
             input_data = cast("Any", state.input)
             system_msg = self._build_system_message(runtime, input_data)
-            human_msg = self._build_human_message(state, runtime, input_data, output_conditions)
+            human_msg = self._build_human_message(
+                state, runtime, input_data, output_conditions
+            )
 
             prompts: list[AnyMessage] = [SystemMessage(system_msg)]
             prompts += state.messages

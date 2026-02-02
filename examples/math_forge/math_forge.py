@@ -136,10 +136,10 @@ class MathLangGraphForge(AgentForge):
     async def compute_fitness(
         self,
         agent: Agent,
-        forge_cycle_id: str | None = None,
-        mode: Literal["train", "test"] = "train",
-        **kwargs: object,
+        **kwargs: str | float | bool | BaseModel,
     ) -> tuple[str, float]:
+        forge_cycle_id = cast("str | None", kwargs.get("forge_cycle_id"))
+        mode = cast("Literal['train', 'test']", kwargs.get("mode", "train"))
         agent_engine = agent.agent_engine
         if agent_engine is None or agent_engine.engine_type != "langgraph_engine":
             self.fitness[agent.id] = {}
@@ -147,7 +147,9 @@ class MathLangGraphForge(AgentForge):
 
         # Update problem set if generation changed
         generation_obj = kwargs.get("generation", 0)
-        generation = int(generation_obj) if isinstance(generation_obj, (int, float, str)) else 0
+        generation = (
+            int(generation_obj) if isinstance(generation_obj, (int, float, str)) else 0
+        )
         if generation != self.current_generation or (
             self.n_problems is not None
             and len(self.current_problem_ids) != self.n_problems
@@ -158,20 +160,27 @@ class MathLangGraphForge(AgentForge):
         # Evaluate all problems concurrently
         tasks = [
             self._evaluate_problem(
-                agent, problem_id, mode, forge_cycle_id, **kwargs,
+                agent,
+                problem_id,
+                mode,
+                forge_cycle_id,
+                **kwargs,
             )
             for problem_id in self.current_problem_ids
         ]
 
         results: list[AgentOutput | float | BaseException] = await asyncio.gather(
-            *tasks, return_exceptions=True,
+            *tasks,
+            return_exceptions=True,
         )
 
         # Calculate total fitness
         fitness = sum(
             self._update_fitness_for_result(agent.id, problem_id, result, mode)
             for problem_id, result in zip(
-                self.current_problem_ids, results, strict=True,
+                self.current_problem_ids,
+                results,
+                strict=True,
             )
         )
 

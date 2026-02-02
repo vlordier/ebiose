@@ -31,6 +31,7 @@ class BaseNode(BaseModel):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Execute the node and return the updated state payload."""
         return {}
 
 
@@ -56,6 +57,16 @@ class StartNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Return an empty payload for the start node.
+
+        Args:
+            state: Input state (unused).
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Empty dictionary.
+
+        """
         _ = state, config  # Unused parameters
         return {}
 
@@ -83,5 +94,15 @@ class EndNode(BaseNode):
         state: BaseModel | dict,
         config: BaseModel | None = None,
     ) -> dict:
+        """Return an empty payload for the end node.
+
+        Args:
+            state: Input state (unused).
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Empty dictionary.
+
+        """
         _ = state, config  # Unused parameters
         return {}

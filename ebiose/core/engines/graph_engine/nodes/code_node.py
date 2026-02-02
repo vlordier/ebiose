@@ -24,10 +24,21 @@ class CodeNode(BaseNode):
     )
 
     async def call_node(
-        self, state: BaseModel | dict, config: BaseModel | None = None,
+        self,
+        state: BaseModel | dict,
+        config: BaseModel | None = None,
     ) -> dict:
+        """Execute the code from the last message in the state.
+
+        Args:
+            state: Input state containing the code payload.
+            config: Optional runtime configuration (unused).
+
+        Returns:
+            Dictionary with execution results and captured locals.
+
+        """
         _ = config  # Unused parameter
-        """Execute the code from the last message in the state using exec and return the result."""
         # Retrieve the last message from the state
         last_message = (
             state.get("messages", [])[-1]
@@ -64,7 +75,7 @@ class CodeNode(BaseNode):
         """
         compiled = compile(code, "<string>", "exec")
         # Intentional use of exec with restricted environment for sandboxed execution
-        restricted_globals = {"__builtins__": {}}
+        restricted_globals: dict[str, Any] = {"__builtins__": {}}
         exec(compiled, restricted_globals, local_vars)
 
     def is_safe_code(self, code: str) -> bool:

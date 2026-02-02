@@ -3,6 +3,10 @@
   <h4> Autonomous AI Agents that Self-Evolve </h4>
   <h3>
 
+[![CI](https://github.com/ebiose-ai/ebiose/actions/workflows/ci.yml/badge.svg?branch=main&style=for-the-badge)](https://github.com/ebiose-ai/ebiose/actions/workflows/ci.yml)
+[![Docs](https://github.com/ebiose-ai/ebiose/actions/workflows/docs.yml/badge.svg?branch=main&style=for-the-badge)](https://github.com/ebiose-ai/ebiose/actions/workflows/docs.yml)
+[![Coverage](https://codecov.io/gh/ebiose-ai/ebiose/branch/main/graph/badge.svg?style=for-the-badge)](https://codecov.io/gh/ebiose-ai/ebiose)
+
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Febiose.com&style=for-the-badge&logo=curl&label=ebiose.com)](https://ebiose.com)
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289DA?style=for-the-badge&logo=discord)](https://discord.gg/P5pEuG5a4V)
@@ -28,6 +32,7 @@ Ebiose is a **distributed artificial intelligence factory**, an open source proj
 **👀 Must read 👀**
 
 - [Founding blog post](https://ebiose.com/blog/ai-for-all-and-by-all) *(10 min)*
+- [Documentation](https://ebiose-ai.github.io/ebiose/) - Full API docs and guides
 - [Glossary](GLOSSARY.md) *(3 min)*
 
 ## 🧪 Current status: Beta 0.1

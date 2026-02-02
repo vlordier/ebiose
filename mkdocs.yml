@@ -1,0 +1,65 @@
+site_name: Ebiose Documentation
+site_description: Automated evolutionary ecosystem for AI agents
+repo_url: https://github.com/ebiose-ai/ebiose
+repo_name: ebiose-ai/ebiose
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - toc.integrate
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [ebiose]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: true
+            show_object_full_path: false
+            show_source: true
+            heading_level: 2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - footnotes
+  - tables
+  - attr_list
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - User Guide:
+    - Concepts: guide/concepts.md
+    - Creating Agents: guide/agents.md
+    - Ecosystems: guide/ecosystems.md
+  - API Reference:
+    - Core: api/core.md
+    - Agents: api/agents.md
+    - Engines: api/engines.md
+    - LLM APIs: api/llm_api.md
+    - Cloud Client: api/cloud_client.md
+    - Tools: api/tools.md
+  - Examples: examples.md
+  - Contributing: contributing.md

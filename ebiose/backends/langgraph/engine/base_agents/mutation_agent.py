@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
 from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.core.engines.graph_engine.nodes.llm_node import LLMNode
@@ -17,6 +18,18 @@ from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
 
 class AgentInput(BaseModel):
+    """Input model for the mutation agent.
+
+    Attributes:
+        forge_description: Description of the problem domain.
+        node_types: List of allowed node types in generated graphs.
+        max_llm_nodes: Maximum number of LLM nodes allowed.
+        parent_configuration: Configuration of parent graph to mutate.
+        node_types_description: Optional description of node types.
+        n_llm_nodes_constraint_string: Constraint string for LLM node count.
+
+    """
+
     forge_description: str
     node_types: list = ["StartNode", "LLMNode", "EndNode"]
     max_llm_nodes: int = 10
@@ -28,7 +41,7 @@ class AgentInput(BaseModel):
 
 
 class AgentOutput(Graph):
-    pass
+    """Output model for the mutation agent (a computational graph)."""
 
 
 SHARED_CONTEXT_PROMPT = """As an expert in Machine Learning, deeply immersed in the most
@@ -79,6 +92,18 @@ Create the offspring graph now and return it into the same format as its parents
 
 
 def init_mutation_agent(model_endpoint_id: str | None) -> Agent:
+    """Initialize a mutation agent for random graph modifications.
+
+    The mutation agent modifies graphs by making random changes to nodes, edges,
+    or prompts while preserving overall structure and problem-solving capability.
+
+    Args:
+        model_endpoint_id: The LLM model endpoint ID to use for the mutation agent.
+
+    Returns:
+        An Agent instance configured as a mutation agent.
+
+    """
     mutation_node = LLMNode(
         id="mutation",
         name="Mutation",
@@ -108,7 +133,7 @@ def init_mutation_agent(model_endpoint_id: str | None) -> Agent:
         ),
     )
 
-    agent_id = "agent-b0d53155-4525-4d4a-92c8-145426f4a4bf"
+    agent_id = SystemAgentId.MUTATION
 
     agent_engine = LangGraphEngine(
         agent_id=agent_id,

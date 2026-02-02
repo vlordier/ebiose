@@ -20,16 +20,47 @@ class TypeSafeUnion:
     """Utilities for union type inspection."""
 
     @staticmethod
-    def safe_getattr(obj: object, attr: str, default: object | None = None) -> object | None:
+    def safe_getattr(
+        obj: object, attr: str, default: object | None = None
+    ) -> object | None:
+        """Safely get an attribute with a default fallback.
+
+        Args:
+            obj: Object to inspect.
+            attr: Attribute name.
+            default: Value to return if attribute is missing.
+
+        Returns:
+            Attribute value or default.
+
+        """
         return getattr(obj, attr, default)
 
     @staticmethod
     def is_union_type(obj_type: object) -> bool:
+        """Check whether the provided type is a Union.
+
+        Args:
+            obj_type: Type object to inspect.
+
+        Returns:
+            True if the type is a Union, False otherwise.
+
+        """
         origin = get_origin(obj_type)
         return origin is UnionType or origin is Union
 
     @staticmethod
     def get_union_args(union_type: object) -> tuple[object, ...]:
+        """Return arguments of a Union type.
+
+        Args:
+            union_type: Union type to inspect.
+
+        Returns:
+            Tuple of member types.
+
+        """
         return get_args(union_type)
 
 
@@ -38,6 +69,16 @@ class DiscriminatedUnion:
 
     @staticmethod
     def match(value: object, union_type: object) -> tuple[str, object]:
+        """Match a value against union member types.
+
+        Args:
+            value: Value to match.
+            union_type: Union type to inspect.
+
+        Returns:
+            Tuple of (matched type name, value).
+
+        """
         if not TypeSafeUnion.is_union_type(union_type):
             return ("single", value)
 
@@ -55,6 +96,15 @@ class TypeRegistry:
 
     @classmethod
     def get_or_create_type(cls, schema: JsonSchema) -> type[object]:
+        """Get a cached type for a schema or create a new one.
+
+        Args:
+            schema: JSON schema mapping.
+
+        Returns:
+            A Python type corresponding to the schema.
+
+        """
         type_key = cls._generate_type_key(schema)
         if type_key in cls._type_cache:
             return cls._type_cache[type_key]
@@ -88,6 +138,15 @@ class TypeSafeSerializer:
 
     @staticmethod
     def serialize(obj: object) -> dict[str, object]:
+        """Serialize an object into a dictionary payload.
+
+        Args:
+            obj: Object to serialize.
+
+        Returns:
+            Serialized dictionary representation.
+
+        """
         if hasattr(obj, "model_dump") and callable(obj.model_dump):
             result = obj.model_dump()
             if isinstance(result, Mapping):
@@ -101,7 +160,19 @@ class TypeSafeSerializer:
         return {"_type": type(obj).__name__, "_value": str(obj)}
 
     @staticmethod
-    def deserialize(data: Mapping[str, object], target_type: type[object]) -> object | None:
+    def deserialize(
+        data: Mapping[str, object], target_type: type[object]
+    ) -> object | None:
+        """Deserialize data into a target type when possible.
+
+        Args:
+            data: Serialized mapping data.
+            target_type: Desired output type.
+
+        Returns:
+            Parsed object or None if parsing fails.
+
+        """
         if hasattr(target_type, "model_validate") and callable(
             target_type.model_validate,
         ):

@@ -1,3 +1,5 @@
+"""High-level Ebiose cloud API client helpers."""
+
 import functools
 import json
 import random
@@ -73,6 +75,8 @@ def build_agent_input_model(
 
 
 class EbioseAPIClient:
+    """Facade client for interacting with Ebiose cloud services."""
+
     _client: EbioseCloudClient | None = None
 
     @classmethod
@@ -300,6 +304,16 @@ class EbioseAPIClient:
         *,
         return_ids_only: bool,
     ) -> list[str] | list["Agent"] | None:
+        """Retrieve agents from an ecosystem.
+
+        Args:
+            ecosystem_id: UUID of the ecosystem to query.
+            return_ids_only: If True, return only agent UUIDs.
+
+        Returns:
+            List of agent IDs or Agent instances, or None on failure.
+
+        """
         response = cls._get_client().list_agents_in_ecosystem(
             ecosystem_uuid=ecosystem_id,
         )
@@ -323,6 +337,17 @@ class EbioseAPIClient:
         description: str,
         ecosystem_id: str,
     ) -> str | None:
+        """Create a forge for an ecosystem.
+
+        Args:
+            name: Forge name.
+            description: Forge description.
+            ecosystem_id: Ecosystem UUID.
+
+        Returns:
+            The created forge UUID if available.
+
+        """
         forge_input_model = ForgeInputModel(
             name=name,
             description=description,
@@ -344,6 +369,19 @@ class EbioseAPIClient:
         *,
         override_key: bool | None = None,
     ) -> tuple[str, str, str, str]:
+        """Start a new forge cycle and return credentials and identifiers.
+
+        Args:
+            ecosystem_id: Ecosystem UUID.
+            forge_name: Forge name to create.
+            forge_description: Forge description.
+            forge_cycle_config: Forge cycle configuration.
+            override_key: Whether to override budget key.
+
+        Returns:
+            Tuple of (lite_llm_key, base_url, forge_cycle_uuid, forge_uuid).
+
+        """
         forge_id = cls.add_forge(
             name=forge_name,
             description=forge_description,
@@ -405,6 +443,15 @@ class EbioseAPIClient:
     @classmethod
     @_handle_api_errors
     def get_cost(cls, forge_cycle_uuid: str) -> float:
+        """Get spend information for a forge cycle.
+
+        Args:
+            forge_cycle_uuid: UUID of the forge cycle.
+
+        Returns:
+            Spent budget value.
+
+        """
         forge_cycle_spend_output = cls._get_client().get_spend(
             forge_cycle_uuid=forge_cycle_uuid,
         )
@@ -429,6 +476,13 @@ class EbioseAPIClient:
 
 
 def get_sample_agent() -> "Agent":
+    """Create a sample math-solving agent for testing/demo use.
+
+    Returns:
+        An Agent instance configured with a solver and verifier node.
+
+    """
+
     class AgentInput(BaseModel):
         math_problem: str = Field(
             ...,

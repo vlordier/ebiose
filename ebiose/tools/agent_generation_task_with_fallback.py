@@ -48,6 +48,19 @@ async def architect_agent_task(
     genetic_operator_agent: Agent | None,
     forge_cycle_id: str | None = None,
 ) -> Agent | None:
+    """Run the architect agent to generate a new agent with fallback retry.
+
+    Args:
+        forge: Forge providing configuration and defaults.
+        architect_agent: Architect agent to use for generation.
+        architect_agent_input: Input payload for the architect agent.
+        genetic_operator_agent: Genetic operator agent for new agent creation.
+        forge_cycle_id: Optional forge cycle identifier.
+
+    Returns:
+        The generated Agent, or None if no genetic operator is provided.
+
+    """
     if genetic_operator_agent is None:
         return None
 
@@ -88,6 +101,15 @@ async def architect_agent_task(
 async def crossover_agent_task(
     config: CrossoverAgentTaskConfig,
 ) -> Agent | None:
+    """Run crossover agent task with architect fallback on failure.
+
+    Args:
+        config: Crossover agent task configuration.
+
+    Returns:
+        Generated offspring agent or None if generation fails.
+
+    """
     forge = config.forge
     genetic_operator_agent = config.genetic_operator_agent
     crossover_agent_input = config.crossover_agent_input
@@ -119,7 +141,10 @@ async def crossover_agent_task(
         )
         if architect_agent is None:
             return None
-        if architect_agent.agent_engine is None or architect_agent.agent_engine.input_model is None:
+        if (
+            architect_agent.agent_engine is None
+            or architect_agent.agent_engine.input_model is None
+        ):
             return None
         fallback_input = architect_agent.agent_engine.input_model(
             forge_description=forge.description,

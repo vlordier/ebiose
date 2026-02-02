@@ -7,18 +7,30 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, Protocol
 
 from pydantic import BaseModel
 
-from ebiose.cloud_client.ebiose_api_client import EbioseAPIClient
 from ebiose.core.model_endpoint import ModelEndpoints
 
 if TYPE_CHECKING:
     from langchain_core.messages import AnyMessage
 
 
+class LLMCallConfigProtocol(Protocol):
+    """Protocol describing configuration required for LLM calls."""
+
+    model_endpoint_id: str
+    messages: list[AnyMessage]
+    agent_id: str
+    temperature: float
+    max_tokens: int
+    tools: list | None
+
+
 class LLMAPIConfig(BaseModel):
+    """Configuration options for LLM API calls."""
+
     request_timeout_in_minutes: float = 2.0
     max_retries: int = 1
     model_name: str | None = None
@@ -27,6 +39,8 @@ class LLMAPIConfig(BaseModel):
 
 
 class LLMApi(ABC):
+    """Abstract base class for LLM provider integrations."""
+
     _llm_api_config: LLMAPIConfig = LLMAPIConfig()
     mode: Literal["local", "cloud"] = "cloud"
     lite_llm_api_key: str | None = None
@@ -42,6 +56,18 @@ class LLMApi(ABC):
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
     ) -> type[LLMApi]:
+        """Initialize global LLM API configuration.
+
+        Args:
+            mode: Execution mode ("local" or "cloud").
+            lite_llm_api_key: API key for LiteLLM or cloud proxy.
+            lite_llm_api_base: Base URL for LiteLLM or cloud proxy.
+            llm_api_config: Optional configuration overrides.
+
+        Returns:
+            The LLMApi class.
+
+        """
         cls.mode = mode
         cls.lite_llm_api_key = lite_llm_api_key
 
@@ -72,6 +98,8 @@ class LLMApi(ABC):
     def get_total_cost(cls, forge_cycle_id: str | None = None) -> float:
         """Override to add cloud mode support."""
         if cls.mode == "cloud" and forge_cycle_id is not None:
+            from ebiose.cloud_client.ebiose_api_client import EbioseAPIClient
+
             # If in cloud mode, get the total cost from the API
             return float(EbioseAPIClient.get_cost(forge_cycle_uuid=forge_cycle_id))
         return cls.total_cost
@@ -83,7 +111,10 @@ class LLMApi(ABC):
 
     @classmethod
     @abstractmethod
-    async def process_llm_call(cls, config: object) -> AnyMessage:
+    async def process_llm_call(
+        cls,
+        config: LLMCallConfigProtocol,
+    ) -> AnyMessage:
         """Process an LLM call with backend-specific implementation.
 
         Args:

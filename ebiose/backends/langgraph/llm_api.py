@@ -7,65 +7,104 @@ This software is licensed under the MIT License. See LICENSE for details.
 from __future__ import annotations
 
 import traceback
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langchain_community.chat_models import ChatLiteLLM
-
-try:
-    from langchain_community.chat_models.azureml_endpoint import (
-        AzureMLChatOnlineEndpoint,
-        AzureMLEndpointApiType,
-        CustomOpenAIChatContentFormatter,
-    )
-except ImportError:
-    AzureMLChatOnlineEndpoint = None
-    AzureMLEndpointApiType = None
-    CustomOpenAIChatContentFormatter = None
-
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from litellm.cost_calculator import cost_per_token
 from loguru import logger
 from openai import RateLimitError
 
-from ebiose.core.llm_api import LLMApi, LLMAPIConfig
+from ebiose.core.llm_api import LLMApi, LLMAPIConfig, LLMCallConfigProtocol
 from ebiose.core.model_endpoint import ModelEndpoint, ModelEndpoints
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+AzureMLChatOnlineEndpoint: type[Any] | None
+AzureMLEndpointApiType: type[Any] | None
+CustomOpenAIChatContentFormatter: type[Any] | None
+
+try:
+    with warnings.catch_warnings():
+        # Suppress Pydantic V1 deprecation warnings from langchain_community
+        # We need to catch the specific Pydantic warning which might not be a direct DeprecationWarning subclass in the way we expect
+        # or the module filtering was wrong.
+        warnings.simplefilter("ignore")
+        from langchain_community.chat_models.azureml_endpoint import (
+            AzureMLChatOnlineEndpoint,
+            AzureMLEndpointApiType,
+            CustomOpenAIChatContentFormatter,
+        )
+except ImportError:
+    AzureMLChatOnlineEndpoint = None
+    AzureMLEndpointApiType = None
+    CustomOpenAIChatContentFormatter = None
+
 # Optional provider imports - wrap in try/except for graceful degradation
+ChatAnthropic: type[Any] | None
 try:
     from langchain_anthropic import ChatAnthropic
 except ImportError:
     ChatAnthropic = None
 
+HuggingFaceEndpoint: type[Any] | None
 try:
     from langchain_huggingface import HuggingFaceEndpoint
 except ImportError:
     HuggingFaceEndpoint = None
 
+ChatGoogleGenerativeAI: type[Any] | None
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI
 except ImportError:
     ChatGoogleGenerativeAI = None
 
+ChatOllama: type[Any] | None
 try:
     from langchain_ollama import ChatOllama
 except ImportError:
     ChatOllama = None
 
 if TYPE_CHECKING:
+    from langchain_anthropic import ChatAnthropic as ChatAnthropicType
+    from langchain_community.chat_models.azureml_endpoint import (
+        AzureMLChatOnlineEndpoint as AzureMLChatOnlineEndpointType,
+    )
+    from langchain_community.chat_models.azureml_endpoint import (
+        AzureMLEndpointApiType as AzureMLEndpointApiTypeType,
+    )
+    from langchain_community.chat_models.azureml_endpoint import (
+        CustomOpenAIChatContentFormatter as CustomOpenAIChatContentFormatterType,
+    )
     from langchain_core.messages import AnyMessage
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI as ChatGoogleGenerativeAIType,
+    )
+    from langchain_huggingface import HuggingFaceEndpoint as HuggingFaceEndpointType
+    from langchain_ollama import ChatOllama as ChatOllamaType
     from pydantic import SecretStr
+else:
+    AzureMLChatOnlineEndpointType = Any
+    AzureMLEndpointApiTypeType = Any
+    CustomOpenAIChatContentFormatterType = Any
+    ChatAnthropicType = Any
+    HuggingFaceEndpointType = Any
+    ChatGoogleGenerativeAIType = Any
+    ChatOllamaType = Any
 
 # Type alias for all possible LLM return types
-LLMType = (
+type LLMType = (
     ChatOpenAI
     | ChatLiteLLM
     | AzureChatOpenAI
-    | AzureMLChatOnlineEndpoint
-    | ChatAnthropic
-    | HuggingFaceEndpoint
-    | ChatGoogleGenerativeAI
-    | ChatOllama
+    | AzureMLChatOnlineEndpointType
+    | ChatAnthropicType
+    | HuggingFaceEndpointType
+    | ChatGoogleGenerativeAIType
+    | ChatOllamaType
 )
 
 
@@ -112,11 +151,25 @@ class LangGraphLLMApiError(Exception):
         original_exception: Exception | None = None,
         llm_identifier: str | None = None,
     ) -> None:
+        """Initialize the exception with optional nested error context.
+
+        Args:
+            message: Error message.
+            original_exception: Underlying exception that caused the error.
+            llm_identifier: Identifier of the LLM that caused the error.
+
+        """
         super().__init__(message)
         self.original_exception = original_exception
         self.llm_identifier = llm_identifier
 
     def __str__(self) -> str:
+        """Return a detailed error message including nested traceback info.
+
+        Returns:
+            A formatted error string containing context and original traceback.
+
+        """
         error_msg = "LangGraphLLMApiError"
         if self.llm_identifier:
             error_msg += f" (LLM: {self.llm_identifier})"
@@ -132,6 +185,8 @@ class LangGraphLLMApiError(Exception):
 
 
 class LangGraphLLMApi(LLMApi):
+    """LangGraph-backed LLM API implementation."""
+
     @classmethod
     def initialize(
         cls,
@@ -140,6 +195,18 @@ class LangGraphLLMApi(LLMApi):
         lite_llm_api_base: str | None = None,
         llm_api_config: LLMAPIConfig | None = None,
     ) -> type[LangGraphLLMApi]:
+        """Initialize the LangGraph LLM API configuration.
+
+        Args:
+            mode: Execution mode ("local" or "cloud").
+            lite_llm_api_key: API key for LiteLLM or cloud proxy.
+            lite_llm_api_base: Base URL for LiteLLM or cloud proxy.
+            llm_api_config: Optional LLM API configuration overrides.
+
+        Returns:
+            The LangGraph LLM API class.
+
+        """
         cls.mode = mode
         cls.lite_llm_api_key = lite_llm_api_key
 
@@ -193,10 +260,14 @@ class LangGraphLLMApi(LLMApi):
 
         # LiteLLM handling
         if ModelEndpoints.use_lite_llm_proxy():
-            return cls._create_litellm_proxy_llm(model_endpoint_id, temperature, max_tokens)
+            return cls._create_litellm_proxy_llm(
+                model_endpoint_id, temperature, max_tokens
+            )
 
         if ModelEndpoints.use_lite_llm():
-            return cls._create_litellm_llm(model_endpoint, temperature, max_tokens, request_timeout, max_retries)
+            return cls._create_litellm_llm(
+                model_endpoint, temperature, max_tokens, request_timeout, max_retries
+            )
 
         # Provider-specific handling
         provider_config = LLMProviderConfig(
@@ -210,7 +281,9 @@ class LangGraphLLMApi(LLMApi):
         return cls._create_provider_llm(provider_config)
 
     @classmethod
-    def _create_cloud_llm(cls, model_endpoint_id: str, temperature: float, max_tokens: int) -> ChatOpenAI:
+    def _create_cloud_llm(
+        cls, model_endpoint_id: str, temperature: float, max_tokens: int
+    ) -> ChatOpenAI:
         """Create LLM for cloud mode."""
         return ChatOpenAI(
             openai_api_key=cls.lite_llm_api_key,
@@ -221,7 +294,9 @@ class LangGraphLLMApi(LLMApi):
         )
 
     @classmethod
-    def _create_litellm_proxy_llm(cls, model_endpoint_id: str, temperature: float, max_tokens: int) -> ChatOpenAI:
+    def _create_litellm_proxy_llm(
+        cls, model_endpoint_id: str, temperature: float, max_tokens: int
+    ) -> ChatOpenAI:
         """Create LLM for LiteLLM proxy mode."""
         lite_llm_api_key, lite_llm_api_base = ModelEndpoints.get_lite_llm_config()
         return ChatOpenAI(
@@ -264,79 +339,105 @@ class LangGraphLLMApi(LLMApi):
         max_retries = config.max_retries
 
         # Define provider-specific creation strategies
-        provider_strategies = {
-            "OpenAI": lambda: ChatOpenAI(
-                model=model_endpoint_id,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=safe_get_secret_value(model_endpoint.api_key),
-            ),
-            "OpenRouter": lambda: ChatOpenAI(
-                openai_api_base=safe_get_secret_value(model_endpoint.endpoint_url),
-                model=model_endpoint_id,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=safe_get_secret_value(model_endpoint.api_key),
-            ),
-            "AzureOpenAI": lambda: AzureChatOpenAI(
-                azure_deployment=model_endpoint.deployment_name,
-                azure_endpoint=safe_get_secret_value(model_endpoint.endpoint_url),
-                openai_api_key=safe_get_secret_value(model_endpoint.api_key),
-                openai_api_version=model_endpoint.api_version,
-                temperature=temperature,
-                request_timeout=request_timeout,
-                max_retries=max_retries,
-                max_tokens=max_tokens,
-            ),
-            "Azure AI": lambda: cast("Any", AzureMLChatOnlineEndpoint)(
-                endpoint_url=safe_get_secret_value(model_endpoint.endpoint_url),
-                endpoint_api_type=cast("Any", AzureMLEndpointApiType).serverless,
-                endpoint_api_key=safe_get_secret_value(model_endpoint.api_key),
-                content_formatter=cast("Any", CustomOpenAIChatContentFormatter)(),
-                timeout=request_timeout,
-                max_retries=max_retries,
-                max_tokens=max_tokens,
-                model_kwargs={"temperature": temperature},
-            ),
-        }
-
-        # Providers requiring optional imports
-        optional_providers = {
-            "Anthropic": (
-                ChatAnthropic,
-                "langchain_anthropic not installed. Install with: pip install langchain-anthropic",
-                lambda: cast("Any", ChatAnthropic)(
+        provider_strategies: dict[str, Callable[[], LLMType]] = {
+            "OpenAI": lambda: cast(
+                "LLMType",
+                ChatOpenAI(
                     model=model_endpoint_id,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     api_key=safe_get_secret_value(model_endpoint.api_key),
                 ),
             ),
+            "OpenRouter": lambda: cast(
+                "LLMType",
+                ChatOpenAI(
+                    openai_api_base=safe_get_secret_value(model_endpoint.endpoint_url),
+                    model=model_endpoint_id,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    api_key=safe_get_secret_value(model_endpoint.api_key),
+                ),
+            ),
+            "AzureOpenAI": lambda: cast(
+                "LLMType",
+                AzureChatOpenAI(
+                    azure_deployment=model_endpoint.deployment_name,
+                    azure_endpoint=safe_get_secret_value(model_endpoint.endpoint_url),
+                    openai_api_key=safe_get_secret_value(model_endpoint.api_key),
+                    openai_api_version=model_endpoint.api_version,
+                    temperature=temperature,
+                    request_timeout=request_timeout,
+                    max_retries=max_retries,
+                    max_tokens=max_tokens,
+                ),
+            ),
+            "Azure AI": lambda: cast(
+                "LLMType",
+                cast("Any", AzureMLChatOnlineEndpoint)(
+                    endpoint_url=safe_get_secret_value(model_endpoint.endpoint_url),
+                    endpoint_api_type=cast("Any", AzureMLEndpointApiType).serverless,
+                    endpoint_api_key=safe_get_secret_value(model_endpoint.api_key),
+                    content_formatter=cast("Any", CustomOpenAIChatContentFormatter)(),
+                    timeout=request_timeout,
+                    max_retries=max_retries,
+                    max_tokens=max_tokens,
+                    model_kwargs={"temperature": temperature},
+                ),
+            ),
+        }
+
+        # Providers requiring optional imports
+        optional_providers: dict[
+            str, tuple[type[Any] | None, str, Callable[[], LLMType]]
+        ] = {
+            "Anthropic": (
+                ChatAnthropic,
+                "langchain_anthropic not installed. Install with: pip install langchain-anthropic",
+                lambda: cast(
+                    "LLMType",
+                    cast("Any", ChatAnthropic)(
+                        model=model_endpoint_id,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        api_key=safe_get_secret_value(model_endpoint.api_key),
+                    ),
+                ),
+            ),
             "HuggingFace": (
                 HuggingFaceEndpoint,
                 "langchain_huggingface not installed. Install with: pip install langchain-huggingface",
-                lambda: cast("Any", HuggingFaceEndpoint)(
-                    repo_id=model_endpoint_id,
-                    task="text-generation",
-                    max_new_tokens=max_tokens,
+                lambda: cast(
+                    "LLMType",
+                    cast("Any", HuggingFaceEndpoint)(
+                        repo_id=model_endpoint_id,
+                        task="text-generation",
+                        max_new_tokens=max_tokens,
+                    ),
                 ),
             ),
             "Google": (
                 ChatGoogleGenerativeAI,
                 "langchain_google_genai not installed. Install with: pip install langchain-google-genai",
-                lambda: cast("Any", ChatGoogleGenerativeAI)(
-                    model=model_endpoint_id,
-                    google_api_key=safe_get_secret_value(model_endpoint.api_key),
+                lambda: cast(
+                    "LLMType",
+                    cast("Any", ChatGoogleGenerativeAI)(
+                        model=model_endpoint_id,
+                        google_api_key=safe_get_secret_value(model_endpoint.api_key),
+                    ),
                 ),
             ),
             "Ollama": (
                 ChatOllama,
                 "langchain_ollama not installed. Install with: pip install langchain-ollama",
-                lambda: cast("Any", ChatOllama)(
-                    model=model_endpoint_id.replace("ollama/", ""),
-                    temperature=temperature,
-                    num_predict=max_tokens,
-                    base_url=safe_get_secret_value(model_endpoint.endpoint_url),
+                lambda: cast(
+                    "LLMType",
+                    cast("Any", ChatOllama)(
+                        model=model_endpoint_id.replace("ollama/", ""),
+                        temperature=temperature,
+                        num_predict=max_tokens,
+                        base_url=safe_get_secret_value(model_endpoint.endpoint_url),
+                    ),
                 ),
             ),
         }
@@ -383,11 +484,6 @@ class LangGraphLLMApi(LLMApi):
 
         llm = cls._get_llm(model_endpoint_id, temperature, max_tokens)
 
-        # Ensure llm is not None
-        if llm is None:
-            msg = f"Failed to initialize LLM for model endpoint '{model_endpoint_id}'"
-            raise LangGraphLLMApiError(msg, llm_identifier=model_endpoint_id)
-
         # Add tools
         if tools:
             # We use cast here because LLMType is a union that technically includes NoneType
@@ -395,15 +491,22 @@ class LangGraphLLMApi(LLMApi):
             llm = cast("Any", llm).bind_tools(tools=tools)
 
         # Call LLM
-        response = await cast("Any", llm).with_retry(
-            retry_if_exception_type=(RateLimitError,),  # APITimeoutError
-            wait_exponential_jitter=True,
-            stop_after_attempt=10,
-        ).ainvoke(messages)
+        response = (
+            await cast("Any", llm)
+            .with_retry(
+                retry_if_exception_type=(RateLimitError,),  # APITimeoutError
+                wait_exponential_jitter=True,
+                stop_after_attempt=10,
+            )
+            .ainvoke(messages)
+        )
         return cast("AnyMessage", response)
 
     @classmethod
-    async def process_llm_call(cls, config: object) -> AnyMessage:
+    async def process_llm_call(
+        cls,
+        config: LLMCallConfigProtocol,
+    ) -> AnyMessage:
         """Process LLM call with config object.
 
         Args:

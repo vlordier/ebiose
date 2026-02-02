@@ -75,11 +75,27 @@ if TYPE_CHECKING:
 
 
 class AgentFactory:
+    """Factory for creating and loading agents.
+
+    Provides methods to instantiate agents from configurations,
+    API responses, and other sources.
+    """
+
     @staticmethod
     def load_agent_from_api(
         agent_data: AgentOutputModel,
         model_endpoint_id: str | None = None,
     ) -> Agent:
+        """Load an agent from API response data.
+
+        Args:
+            agent_data: Agent data from API response.
+            model_endpoint_id: Optional LLM model endpoint ID.
+
+        Returns:
+            Configured Agent instance.
+
+        """
         return AgentFactory.load_agent(
             agent_data.model_dump(by_alias=True),
             model_endpoint_id=model_endpoint_id,
@@ -90,6 +106,20 @@ class AgentFactory:
         agent_config: dict,
         model_endpoint_id: str | None = None,
     ) -> Agent:
+        """Load an agent from configuration dictionary.
+
+        Args:
+            agent_config: Configuration dictionary with agent settings.
+            model_endpoint_id: Optional LLM model endpoint ID.
+
+        Returns:
+            Configured Agent instance.
+
+        Raises:
+            TypeError: If agent_engine config format is invalid.
+            ValueError: If required configuration fields are missing.
+
+        """
         agent_id = agent_config.get("id") or "unknown"
 
         # Validate agent_engine config structure
@@ -129,6 +159,20 @@ class AgentFactory:
         response_dict: AgentOutputModel,
         model_endpoint_id: str | None = None,
     ) -> Agent:
+        """Create an Agent instance from API response data.
+
+        Args:
+            response_dict: Agent data returned by the cloud API.
+            model_endpoint_id: Optional model endpoint override.
+
+        Returns:
+            A configured Agent instance.
+
+        Raises:
+            ValueError: If required engine configuration is missing or invalid.
+            RuntimeError: If engine creation fails.
+
+        """
         # Validate required fields
         if response_dict.agent_engine is None:
             msg = "Agent engine configuration is missing"
@@ -324,7 +368,9 @@ class AgentFactory:
                 architect_agent_id=config.ecosystem.id if config.ecosystem else None,
                 genetic_operator_agent_id=crossover_agent.id,
                 agent_engine=generated_agent_engine,
-                parent_ids=[config.parent1.id, config.parent2.id] if config.parent2 else [config.parent1.id],
+                parent_ids=[config.parent1.id, config.parent2.id]
+                if config.parent2
+                else [config.parent1.id],
             )
         except Exception as e:
             logger.debug(f"Crossover agent failed creating a valid agent: {e!s}")

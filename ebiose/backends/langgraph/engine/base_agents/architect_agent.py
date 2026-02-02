@@ -11,12 +11,25 @@ from pydantic import BaseModel
 from ebiose.backends.langgraph.engine.langgraph_engine import LangGraphEngine
 from ebiose.backends.langgraph.engine.llm_node import LangGraphLLMNode
 from ebiose.core.agent import Agent
+from ebiose.core.constants import SystemAgentId
 from ebiose.core.engines.graph_engine.edge import Edge
 from ebiose.core.engines.graph_engine.graph import Graph
 from ebiose.core.engines.graph_engine.nodes.node import EndNode, StartNode
 
 
 class AgentInput(BaseModel):
+    """Input model for the architect agent.
+
+    Attributes:
+        forge_description: Description of the forge/problem domain.
+        node_types: List of node types allowed in the generated graph.
+        max_llm_nodes: Maximum number of LLM nodes in the generated graph.
+        random_n_llm_nodes: Whether to randomly determine the number of LLM nodes.
+        node_types_description: Optional description of available node types.
+        n_llm_nodes_constraint_string: Constraint string for LLM node count.
+
+    """
+
     forge_description: str
     node_types: list = ["StartNode", "LLMNode", "EndNode"]
     max_llm_nodes: int = 10
@@ -24,8 +37,9 @@ class AgentInput(BaseModel):
     node_types_description: str | None = None
     n_llm_nodes_constraint_string: str | None = None
 
+
 class AgentOutput(Graph):
-    pass
+    """Output model for the architect agent (a computational graph)."""
 
 
 SHARED_CONTEXT_PROMPT = """As an expert in Machine Learning, deeply immersed in the
@@ -113,6 +127,19 @@ def init_architect_agent(
     model_endpoint_id: str | None,
     **kwargs: bool | str | int,
 ) -> Agent:
+    """Initialize an architect agent for designing graph architectures.
+
+    The architect agent is responsible for generating and designing computational graphs
+    that solve problems. It creates the structure of nodes and edges based on a task description.
+
+    Args:
+        model_endpoint_id: The LLM model endpoint ID to use for the architect agent.
+        **kwargs: Additional configuration options for the agent.
+
+    Returns:
+        An Agent instance configured as an architect agent.
+
+    """
     add_format_node = kwargs.get("add_format_node", True)
 
     graph_outline_generation_node = LangGraphLLMNode(
@@ -183,7 +210,7 @@ def init_architect_agent(
             Edge(start_node_id=format_node.id, end_node_id=end_node.id),
         )
 
-    agent_id = "agent-54c2124d-a473-43e6-ae1c-24a217ff7607"
+    agent_id = SystemAgentId.ARCHITECT
 
     agent_engine = LangGraphEngine(
         agent_id=agent_id,
