@@ -14,7 +14,7 @@ try:
     from langfuse.callback import CallbackHandler
 except Exception:  # pragma: no cover - optional integration
     CallbackHandler = None
-from langfuse.decorators import observe
+from langfuse import observe
 from langgraph.graph import StateGraph
 from langgraph.graph import END, START
 from langgraph.pregel import Pregel
